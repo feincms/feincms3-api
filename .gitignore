@@ -1,0 +1,11 @@
+*~
+*.egg-info
+*.pyc
+.coverage
+.DS_Store
+.tox
+/build
+/dist
+/htmlcov
+/.venv
+/venv
