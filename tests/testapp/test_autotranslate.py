@@ -481,10 +481,34 @@ class RoundTripTests(Fixture):
         # tab list again into its region
         m.Page.objects.filter(language_code="fr").update(is_active=True)
         dumps = self.dumps("tablists:Fragen")
-        run, _log = self.load(self.translate(dumps), replace=True)
+        run, log = self.load(self.translate(dumps), replace=True)
         report = run.report()
         self.assertTrue(report.startswith("GOES LIVE AT ONCE"), report)
+        self.assertEqual(len(log["live"]), 1)
         self.assertEqual(m.Tab.objects.filter(region="fr").count(), 1)
+
+    def test_activate(self):
+        dumps = self.dumps("pages:Angebot", "forms:*")
+        run, log = self.load(self.translate(dumps), activate=True)
+        self.assertTrue(log["activate"])
+        self.assertIn("--activate: the new copies are active", run.report())
+        angebot = m.Page.objects.get(language_code="fr", translation_of=self.angebot)
+        self.assertTrue(angebot.is_active)
+        # offline={...} still applies, forms have no is_active
+        self.assertEqual(m.Form.objects.get(language_code="fr").slot, "")
+
+        # Existing translations keep what an editor decided
+        angebot.is_active = False
+        angebot.save()
+        dumps = self.dumps("pages:Angebot|subtree")
+        self.load(self.translate(dumps), activate=True, replace=True)
+        angebot.refresh_from_db()
+        self.assertFalse(angebot.is_active)
+        self.assertTrue(
+            m.Page.objects.get(
+                language_code="fr", translation_of=self.details
+            ).is_active
+        )
 
     def test_failed_object(self):
         dumps = self.dumps("pages:Angebot|subtree")

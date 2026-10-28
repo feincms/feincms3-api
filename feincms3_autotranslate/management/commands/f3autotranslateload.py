@@ -13,9 +13,9 @@ from feincms3_autotranslate.strings import DumpError, read_dumps
 
 class Command(BaseCommand):
     help = (
-        "Loads a translated file as inactive copies, or plans what dumps"
-        " would need translating (--plan). The log goes to stdout, the report"
-        " to stderr."
+        "Loads a translated file as inactive copies (active with --activate),"
+        " or plans what dumps would need translating (--plan). The log goes to"
+        " stdout, the report to stderr."
     )
 
     def add_arguments(self, parser):
@@ -39,6 +39,14 @@ class Command(BaseCommand):
             help="Replace the content of existing translations. Corrections are lost.",
         )
         parser.add_argument(
+            "--activate",
+            action="store_true",
+            help=(
+                "Create the copies active (is_active = True) instead of inactive."
+                " They go live without a review in the admin."
+            ),
+        )
+        parser.add_argument(
             "--into",
             action="append",
             metavar="MODEL:PK=PK|LOG",
@@ -51,6 +59,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         kwargs = {
             "replace": options["replace"],
+            "activate": options["activate"],
             "into": parse_into(options["into"]),
             "parent": options["parent"],
         }

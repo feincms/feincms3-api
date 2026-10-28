@@ -192,6 +192,7 @@ class Run:
         target,
         statuses=None,
         replace=False,
+        activate=False,
         into=None,
         parent=None,
         registry=None,
@@ -211,6 +212,7 @@ class Run:
         self.statuses = statuses
         self.dry_run = False
         self.replace = replace
+        self.activate = activate
         self.into = into or {}
         self.parent_pk = parent
         self.problems = {
@@ -711,7 +713,7 @@ class Run:
         model = entry.model
         obj.language_code = self.target
         if has_field(model, "is_active"):
-            obj.is_active = False
+            obj.is_active = self.activate
         for name, value in (entry.config.offline or {}).items():
             setattr(obj, name, value)
         if has_field(model, "translation_of"):
@@ -1012,9 +1014,12 @@ class Run:
         return {
             "feincms3_autotranslate_log": 1,
             "dry_run": self.dry_run,
+            "activate": self.activate,
             "source": self.source,
             "target": self.target,
             "objects": objects,
+            # Shared objects with a region per language, live on loading
+            "live": sorted(set(self.problems["live"])),
         }
 
     def report(self):
@@ -1030,6 +1035,15 @@ class Run:
             sorted(set(self.problems["live"])),
         )
         warnings = []
+        if self.activate and any(
+            e.action == CREATE and has_field(e.model, "is_active")
+            for e in self.entries.values()
+        ):
+            warnings.append(
+                "--activate: the new copies are active and visible as soon as"
+                " they're loaded. Translations which existed already keep their"
+                " is_active, and offline={...} of the datasets still applies."
+            )
         for config in self.registry.translatable.values():
             model = config.model
             if not any(e.model is model for e in self.entries.values()):

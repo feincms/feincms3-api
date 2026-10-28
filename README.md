@@ -87,6 +87,20 @@ refused. The copies get `is_active = False`, the target language, and
   the object, the new region is live as soon as it's loaded. The report lists
   these first.
 
+### Loading active copies
+
+`f3autotranslateload --activate` creates the copies with `is_active = True`,
+for a language which goes live without a review in the admin (a new site
+section, or a language nobody reads yet). The report says so at the top of
+its warnings. It changes nothing else:
+
+- translations which exist already keep their `is_active`, also with
+  `--replace`, since activating them is an editor's decision;
+- `offline={...}` of a dataset still applies, so a model without
+  `is_active` stays offline the way its dataset says.
+
+Pass it to the dry run too, so the report describes the load which follows.
+
 ## Selection
 
 `Angebot`, `angebot` or `17` (exact title, exact slug, pk), with pages
