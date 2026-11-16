@@ -37,7 +37,6 @@ from feincms3_api.incubator.autotranslate.fields import (
     HTML,
     LINK,
     field_specs,
-    iter_path,
     json_proxies,
 )
 from feincms3_api.incubator.autotranslate.links import (
@@ -57,6 +56,7 @@ from feincms3_api.incubator.autotranslate.strings import (
     unit_key,
     unit_strings,
 )
+from feincms3_api.paths import iter_path
 
 
 CREATE = "create"

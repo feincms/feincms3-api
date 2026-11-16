@@ -10,8 +10,8 @@ feincms3-forms fields keep their names, values and defaults.
 Link fields (``URLField``, ``url``, ``*_url``, ``LINK_FIELDS``) aren't
 translated but mapped, see ``feincms3_api.incubator.autotranslate.links``.
 
-Paths go on from the field with dots, and ``[]`` stands for every item of a
-list: ``data.figures[].title``.
+Kinds, JSON schema walking and the path notation are the package's own,
+see ``feincms3_api.kinds`` and ``feincms3_api.paths``.
 """
 
 import dataclasses
@@ -23,6 +23,16 @@ from django.db import models
 
 from feincms3_api.incubator.autotranslate.conf import config
 from feincms3_api.incubator.autotranslate.datasets import is_translated_field, label
+from feincms3_api.kinds import (
+    CHOICES,
+    HTML,
+    LINK,
+    MACHINE_NAMES as EXCLUDED_NAMES,
+    TEXT,
+    is_link_name as _is_link_name,
+    json_string_kind,
+    schema_paths as _schema_paths,
+)
 
 
 try:
@@ -39,34 +49,6 @@ try:
     from feincms3_forms.models import FormFieldBase
 except ImportError:  # pragma: no cover
     FormFieldBase = None
-
-
-TEXT = "text"
-HTML = "html"
-CHOICES = "choices"
-LINK = "link"
-
-# Never text, whatever their type says. feincms3-meta's ``meta_canonical``
-# isn't here: it's a URLField, so it's a link, and mapped to the copy.
-EXCLUDED_NAMES = {
-    "app_instance_namespace",
-    "app_namespace",
-    "language_code",
-    "menu",
-    # django-imagefield's primary point of interest, "0.5x0.5"
-    "meta_image_ppoi",
-    "meta_robots",
-    "page_type",
-    "path",
-    "region",
-    "slug",
-    "template_key",
-    "type",
-}
-
-# String formats of json-editor which are still text for people.
-TEXT_FORMATS = {"textarea": TEXT, "prose": HTML}
-LINK_FORMATS = {"uri", "url", "uri-reference"}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -86,10 +68,6 @@ class FieldSpec:
         return self.path
 
 
-def _is_link_name(name):
-    return name == "url" or name.endswith("_url")
-
-
 def json_proxies(model):
     """The django-json-schema-editor proxies of a concrete JSON plugin model"""
     if JSONPluginBase is None or not issubclass(model, JSONPluginBase):
@@ -97,30 +75,14 @@ def json_proxies(model):
     return list(getattr(model, "_proxy_types_map", {}).values())
 
 
-def _schema_paths(schema, prefix, name=""):
-    """``(path, schema)`` for every value the schema describes"""
-    yield prefix, schema
-    type = schema.get("type")
-    if type == "object":
-        for key, sub in schema.get("properties", {}).items():
-            yield from _schema_paths(sub, f"{prefix}.{key}", key)
-    elif type == "array" and isinstance(schema.get("items"), dict):
-        yield from _schema_paths(schema["items"], f"{prefix}[]", name)
-
-
 def _schema_specs(schema, prefix, *, is_link):
     for path, sub in _schema_paths(schema, prefix):
-        if sub.get("type") != "string":
-            continue
-        name = path.rsplit(".", 1)[-1].removesuffix("[]")
-        format = sub.get("format")
-        if _is_link_name(name) or format in LINK_FORMATS or is_link(path):
-            yield FieldSpec(path, LINK)
-        elif "enum" in sub or "pattern" in sub:
-            # A pattern constrains the value to something machine-readable.
-            continue
-        elif format is None or format in TEXT_FORMATS:
-            yield FieldSpec(path, TEXT_FORMATS.get(format, TEXT))
+        if (kind := json_string_kind(path, sub, is_link=is_link)) in {
+            TEXT,
+            HTML,
+            LINK,
+        }:
+            yield FieldSpec(path, kind)
 
 
 def _schema(model):
@@ -249,41 +211,3 @@ def list_fields(registry):
         if links:
             lines.append(f"  links: {', '.join(links)}")
     return "\n".join(lines) + "\n"
-
-
-# Walking paths ##############################################################
-
-
-def _tokens(path):
-    """``data.figures[].title`` -> ``["data", [], "figures", ...]``"""
-    return [
-        None if token == "[]" else token
-        for token in re.findall(r"\[\]|[^.\[\]]+", path)
-    ]
-
-
-def iter_path(fields, path):
-    """
-    Yield ``(concrete path, container, key)`` for every value at ``path``
-
-    ``fields`` is the ``"fields"`` dict of a serialized object, or anything
-    else subscriptable. ``container[key]`` is the value, and assigning to it
-    changes it in place.
-    """
-
-    def walk(container, key, concrete, tokens):
-        if not tokens:
-            yield concrete, container, key
-            return
-        value = container[key]
-        token, *rest = tokens
-        if token is None:
-            if isinstance(value, list):
-                for index in range(len(value)):
-                    yield from walk(value, index, f"{concrete}[{index}]", rest)
-        elif isinstance(value, dict) and token in value:
-            yield from walk(value, token, f"{concrete}.{token}", rest)
-
-    first, *rest = _tokens(path)
-    if first in fields:
-        yield from walk(fields, first, first, rest)

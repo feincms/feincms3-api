@@ -22,9 +22,9 @@ from feincms3_api.incubator.autotranslate.fields import (
     CHOICES,
     HTML,
     LINK,
-    iter_path,
     specs_for_raw,
 )
+from feincms3_api.paths import iter_path
 
 
 OWNER = "object"
