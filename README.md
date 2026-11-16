@@ -10,9 +10,131 @@ data and [django-cabinet](https://github.com/matthiask/django-cabinet) files.
 For scripts, importers and agents, next to the Django admin, not instead of
 it.
 
-**Status:** early development. Reading and writing objects and their
-content work, with uploads, pages and django-cabinet. The plan is
-in [specs/api.md](specs/api.md).
+**Status:** alpha. The wire format and the Python API may still change.
+
+The admin is the source of truth: the API finds, validates, saves and
+permits exactly what the admin does, through the admin's querysets, forms,
+formsets, save hooks and permissions. A plugin with custom validation, or a
+project hooking `save_formset()`, behaves the same through the API without
+any code for the API.
+
+- [How it's built](docs/architecture.md): the modules and where a project
+  plugs in.
+- [The spec](specs/api.md): the design and the reasoning behind it.
+- [Issues](https://github.com/feincms/feincms3-api/issues): what's planned.
+
+## Setup
+
+```bash
+pip install feincms3-api
+```
+
+```python
+INSTALLED_APPS = [
+    ...,
+    "feincms3_api",
+]
+```
+
+Register what the API exposes; nothing else is. Each model needs a
+`ModelAdmin`, that's where the forms, permissions and plugins come from:
+
+```python
+# app/content_api.py
+from feincms3_api.api import ContentAPI
+from feincms3_api.cabinet import FileResource, FolderResource
+from feincms3_api.forms import ConfiguredFormResource
+from feincms3_api.resources import ObjectResource, PageResource, TreeResource
+
+from app.articles.models import Article
+from app.forms.models import Form
+from app.pages.models import Page
+
+content_api = ContentAPI()
+content_api.register(PageResource(Page))
+content_api.register(ObjectResource(Article))
+content_api.register(ConfiguredFormResource(Form))  # feincms3-forms
+content_api.register(FileResource())  # django-cabinet
+content_api.register(FolderResource())
+```
+
+Mount it, either as an API of its own or as a router in an existing
+`NinjaAPI`:
+
+```python
+# app/urls.py
+from app.content_api import content_api
+
+urlpatterns = [
+    ...,
+    path("api/content/", content_api.as_api().urls),
+]
+```
+
+`./manage.py migrate` creates the tables for tokens and uploads. The
+interactive docs are at `api/content/docs`.
+
+### Settings
+
+```python
+FEINCMS3_API = {
+    # Never exposed: fields, or values inside JSON data
+    "EXCLUDE_FIELDS": [
+        "forms.form.recipient_email",
+        "pages.jsonplugin_key_figures.data.internal_note",
+    ],
+    "DEFAULT_PAGE_SIZE": 50,
+    "MAX_PAGE_SIZE": 200,
+    "TOKEN_LIFETIME": timedelta(hours=8),
+    "UPLOAD_LIFETIME": timedelta(days=1),
+    "UPLOAD_STORAGE": "default",
+}
+```
+
+### The schema snapshot
+
+`./manage.py f3api_schema app.content_api.content_api` prints every type
+with its fields and what kind of value each is, as a superuser sees them.
+Commit it and compare it in a test, so a new plugin or field becomes
+visible through the API only after someone looked at the diff.
+
+## Using it
+
+Only active staff users can use the API, with their admin permissions.
+Scripts and agents use tokens: staff users create their own in the admin
+(the secret is shown once), or `./manage.py f3api_token USERNAME --write`
+prints one. Tokens are read-only unless created for writing, and expire
+after `TOKEN_LIFETIME`. `./manage.py f3api_cleanup` removes expired tokens
+and uploads; run it daily.
+
+```bash
+API=https://example.com/api/content
+AUTH="Authorization: Bearer f3api_…"
+
+curl -H "$AUTH" $API/schema/                       # what's there
+curl -H "$AUTH" "$API/pages/find/?path=/de/angebot/"
+curl -H "$AUTH" "$API/pages/17/?expand=references"  # one page with its content
+```
+
+Writes need the ETag of what was read (`If-Match`), and fail as a whole with
+every problem and its path. `?dry_run=true` runs a write in a transaction
+which is rolled back and returns what it would have done:
+
+```bash
+curl -X PUT -H "$AUTH" -H 'If-Match: "9f2c…"' -H "Content-Type: application/json" \
+  "$API/pages/17/content/?dry_run=true" \
+  -d '{"content": {"main": [
+        {"type": "pages.richtext", "fields": {"text": "<h2>Hello</h2>"}}
+      ]}}'
+```
+
+**A dry run runs everything but the commit**, signal handlers included:
+anything they do outside the database (sending mail, calling other APIs,
+writing files) happens in a dry run too.
+
+Files are uploaded first (`POST /uploads/`, multipart) and then named in a
+write as `{"upload": "<id>"}`. Changes appear in the admin's history,
+marked "(Through the API.)".
 
 ## Incubator
 
@@ -21,7 +143,8 @@ may go away: tested, but not documented as part of the package, and without
 any promise of stability. At the moment that's
 `feincms3_api.incubator.autotranslate`, which machine-translates feincms3
 content and loads it as inactive copies, see
-[docs/autotranslate.md](docs/autotranslate.md).
+[docs/autotranslate.md](docs/autotranslate.md). It needs the
+`autotranslate` extra.
 
 ## Credits
 

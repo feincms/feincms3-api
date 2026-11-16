@@ -1,4 +1,8 @@
-# feincms3-api: spec (draft)
+# feincms3-api: design
+
+How the API works and why it works that way. How the code is organised is
+in [docs/architecture.md](../docs/architecture.md); what's planned is in the
+[issues](https://github.com/feincms/feincms3-api/issues).
 
 A django-ninja API for reading and writing the content of feincms3 sites:
 pages and other objects with django-content-editor regions and plugins,
@@ -7,11 +11,10 @@ importers and agents (e.g. Claude Code with a token and `curl`), next to the
 admin, not instead of it.
 
 It grows out of feincms3-autotranslate (see "Credits"): its content
-introspection becomes this package's core, and its translation pipeline
-lives in an incubator subpackage (see "Translating" and "Layout"). Ideas
-taken from it: explicit allowlists, a committed snapshot of what's exposed,
-dry runs in a rolled-back transaction, errors as report lines instead of
-tracebacks.
+introspection is this package's core, and its translation pipeline lives in
+an incubator subpackage (see "Translating"). Ideas taken from it: explicit
+allowlists, a committed snapshot of what's exposed, dry runs in a
+rolled-back transaction, errors as report lines instead of tracebacks.
 
 ## Why
 
@@ -273,15 +276,16 @@ codec without being registered.
 
 | form field | wire | schema |
 |---|---|---|
-| `CharField`, `TextField` widget | string | `maxLength` |
-| `ChoiceField`, `TypedChoiceField` | string | `enum` |
-| `BooleanField`, `IntegerField`, `DecimalField`, date/time fields | as JSON | type, bounds, format |
-| `URLField` | string | `format: uri` |
-| `ModelChoiceField`, `ModelMultipleChoiceField` | reference(s) | target type, nullable |
-| cabinet's `CabinetForeignKey` form field | file reference | target `cabinet.file`, images only if `limit_choices_to` says so |
-| django-prose-editor field | HTML string | `contentMediaType: text/html`, allowed tags from the field's extensions |
-| django-json-schema-editor `JSONEditorField` | the JSON value | the field's own schema, `foreign_key_paths` as references |
-| django-imagefield `PPOIField` | `"0.5x0.5"` | `pattern` |
+| `CharField` | string | `maxLength`; the kind from the name and format |
+| `URLField`, `EmailField` | string | `format: uri`, `email`; links |
+| `ChoiceField`, `TypedChoiceField`, `MultipleChoiceField` | string(s) | `enum` |
+| `BooleanField`, `IntegerField`, `FloatField` | as JSON | type, bounds |
+| `DecimalField` | string, to keep the precision | `format: decimal` |
+| date, time, date and time, duration fields | ISO 8601 string | `format` |
+| `ModelChoiceField`, `ModelMultipleChoiceField` (cabinet's `CabinetForeignKey` included) | reference(s) | the target type (`x-feincms3-ref`), nullable |
+| django-prose-editor field | HTML string | `contentMediaType: text/html` |
+| django-json-schema-editor `JSONEditorField` | the JSON value | the field's own schema with kinds; its foreign keys marked as references |
+| `JSONField` | the JSON value | none |
 | `FileField`, `ImageField` (the object's own file) | `{"name", "url"}`; written as `{"upload": id}` | `x-feincms3-file` |
 
 **Text for people.** Every string in the schema also says what it is
@@ -296,35 +300,16 @@ A form field without a codec isn't guessed at: the field is left out, and
 `/schema/` and the snapshot list it as excluded, naming the form field
 class. The project registers a codec or excludes the field explicitly.
 
-**Adapters** decide a plugin's (or object's) `fields` as a whole. The default
-adapter is the admin form with the codecs, and covers every plugin made of
-ordinary fields without any code, e.g. a button plugin with `button_label`,
-`button_url` and `button_page` fields. Adapters shipped:
-
-- **default** (the form's fields through codecs),
-- **feincms3 plugins**: `RichText`, `HTML`, `External`, `Snippet` (template
-  choices from the model), `Image` (its own file, see "Files"),
-- **json-schema-editor proxies**: `fields.data` with the proxy's `SCHEMA`;
-  the form field validates it, references come from `foreign_key_paths`,
-- **feincms3 mixins on objects**: `page_type`/`template_key` with their
-  choices, `menu`, `language_code`, `translation_of`, `redirect_to_page` and
-  `redirect_to_url`, feincms3-meta's fields.
-
-A project writes an adapter only to change the shape, e.g. to group
-`button_label`, `button_url`, `button_page` into one `button` object:
-
-```python
-from feincms3_api.adapters import FormAdapter, Group
-
-content_api.adapters.register(
-    "pages.button",
-    FormAdapter(groups=[Group("button", prefix="button_")]),
-)
-```
-
-An adapter has three methods, `to_wire(obj)`, `to_form_data(value,
-instance)` and `json_schema()`; anything shaped very differently (a plugin
-storing a list in a `TextField`) subclasses it.
+**Adapters** decide a plugin's (or object's) `fields` as a whole. The
+default `FormAdapter` is the admin form's fields through the codecs, and
+covers every plugin and object made of ordinary fields without any code:
+feincms3's plugins and mixins, json-schema-editor proxies, a project's
+button plugin with `button_label`, `button_url` and `button_page`. An
+adapter has `fields()`, `to_wire()`, `form_data()` (the current values with
+the wire values decoded over them) and `json_schema()`; a project registers
+one for a type (`content_api.adapters.register("pages.button", …)`) only to
+change the shape. Adapters which group or reshape fields are
+[#9](https://github.com/feincms/feincms3-api/issues/9).
 
 **The snapshot.** `./manage.py f3api_schema [dotted.path.to.api]` prints
 every type with its fields and their kinds, as a superuser sees them, like
@@ -381,7 +366,10 @@ not the verbose name, which changes with the language):
 | `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
 
 Lists return `{"count", "items"}`, items without `content` unless
-`?content=true`.
+`?content=true`. List filters are declared on the resource (`filters=`),
+not taken from the admin's `list_filter`: its entries can be arbitrary
+`SimpleListFilter`s, and the admin's use case (narrowing a list for a
+person) isn't the API's.
 
 ## Writing content
 
@@ -448,29 +436,31 @@ fields, content and inlines in wire format. Every `PATCH`, `PUT` and `DELETE` ne
 so an admin save can still overwrite an API write; the other direction is
 covered.
 
-## The service layer
+## Operations without HTTP
 
-The endpoints are thin: under them is a Python service layer of functions
-taking a user and wire data (`read(user, resource, pk)`, `create(user,
-resource, data, *, dry_run)`, `update(…)`, `replace_content(…)`), which do
-the form handling, permission checks, validation and logging. The ninja
-endpoints only parse the request, call one function and map its result or
-errors to a response.
+The endpoints are thin: under them are the operations, methods of
+`ContentAPI` taking a request (the admin's methods need one) and wire data
+(`list()`, `detail()`, `create()`, `update()`, `replace_content()`,
+`update_plugin()`, `delete()`), which do the form handling, permission
+checks, validation and logging. The ninja endpoints only parse the request,
+call one operation and map its result or errors to a response.
 
 Two reasons: the logic is testable without HTTP, and work that spans many
 objects can run in one transaction in process. A subtree is many creates,
 and its dry run and its load should each be one `atomic()`; over HTTP that's
 many requests. Management commands (autotranslate, importers) call the
-service layer directly; remote scripts and agents use HTTP and go object by
-object. A batch endpoint (`POST /batch/`, several operations in one
-transaction) would close that gap over HTTP; later, if it's needed.
+operations directly; remote scripts and agents use HTTP and go object by
+object. Several writes in one transaction over HTTP are
+[#6](https://github.com/feincms/feincms3-api/issues/6).
 
 ## Pages
 
-- **Creating** needs `parent` (a page or `null` for a root), `title`,
-  `page_type`/`template_key`, `language_code`; `slug` defaults to
-  `slugify(title)`. `path` is computed by `AbstractPage.save()`, never
-  written, except as `static_path` with `path` where the admin allows it.
+- **Creating** needs what the admin form needs: `parent` (a page or `null`
+  for a root), `title`, `slug`, `page_type`, `language_code`. `path` is
+  computed by `AbstractPage.save()`, never written, except as
+  `static_path` with `path` where the admin allows it. Defaults for new
+  pages (inactive, a slug from the title) are
+  [#8](https://github.com/feincms/feincms3-api/issues/8).
 - **Moving** is a `PATCH` of `parent` and `position` (the position among
   siblings, as in feincms3), through the admin's form like any change, so
   feincms3 updates the descendants' paths and refuses a page below itself.
@@ -480,11 +470,12 @@ transaction) would close that gap over HTTP; later, if it's needed.
   refuses a second instance of an app namespace, as in the admin.
 - **Deleting** a page with children is refused (`409`, listing them);
   delete bottom-up, or not at all.
-- **New pages are inactive** unless `is_active` is given. Pages edited
-  through the API stay as they are, see "Drafts".
 - **feincms3-sites / feincms3-language-sites**: `site` is a field like any
-  other where the model has it; `find` takes `host=`. Path uniqueness is the
-  models' business. Tested in step 4, not before.
+  other where the model has it; `find` takes `host=`, and without it a path
+  used on several sites or languages is a `409` listing the pages. The
+  scope of a path is read from the model's `unique_together`. Path
+  uniqueness is the models' business (feincms3 7.1 and feincms3-sites 0.23
+  check new pages too).
 
 ## Files
 
@@ -534,8 +525,7 @@ fields take uploads. Cabinet's own validation (exactly one file) applies.
   under the same id where the model has cabinet's `OverwriteMixin`.
 - `DELETE /files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
-- `GET /files/?unused=true` lists files no registered model refers to, the
-  report people ask for anyway. Not built yet, see
+- Listing the files nothing refers to is
   [#1](https://github.com/feincms/feincms3-api/issues/1).
 - Folders: a tree of `parent` and `name`; deleting a non-empty folder is
   refused.
@@ -552,19 +542,16 @@ site has instead:
 - **the ETag** against overwriting an editor's work.
 
 Editing an active page through the API changes the live page. Revisions
-(django-reversion, or a JSON snapshot of the wire format before each write)
-are a possible later addition: the wire format would make a good revision
-format. Not v1.
+are [#5](https://github.com/feincms/feincms3-api/issues/5).
 
 ## Authentication and permissions
 
-- `ContentAPI(auth=…)` takes django-ninja auth classes; the default is
-  ninja's `SessionAuthIsStaff`, which is enough for the docs page and calls
-  from the admin.
+- `ContentAPI(auth=…)` takes django-ninja auth classes. The default is
+  bearer tokens, then ninja's `SessionAuthIsStaff` (for the docs page and
+  calls from the admin, with Django's CSRF protection); tokens first, since
+  session auth fails without a CSRF token.
 - **Bearer tokens** for scripts and agents, from a token model in the
-  package (`APIToken`), since the API is tiresome to use without them. The
-  default auth is tokens, then sessions: tokens first, since session auth
-  fails without a CSRF token.
+  package (`APIToken`), since the API is tiresome to use without them.
 - **Creating tokens:** in the admin, where every active staff user manages
   their own (superusers everyone's) without any model permission, so people
   without server access can get one; the secret is shown once, on a page of
@@ -578,17 +565,18 @@ format. Not v1.
   without a fallback revokes every token at once. Tokens are also found
   under `SECRET_KEY_FALLBACKS`, and moved to the current key when used.
   Lifetimes are short: 8 hours by default (`TOKEN_LIFETIME`, a
-  `timedelta`), about one editing session. Logging into the admin (with SSO, where a site has
-  it) and creating a token is the start of a session, e.g. with an agent;
-  raise the lifetime if that proves tiresome.
+  `timedelta`), about one editing session. Logging into the admin (with
+  SSO, where a site has it) and creating a token is the start of a session,
+  e.g. with an agent; raise the lifetime if that proves tiresome.
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.
 - Only staff users (`is_staff`) can use the API at all, since every
   permission check goes through the admin.
 - Who changed what: `LogEntry` rows as the admin writes them
-  (`log_addition`, `log_change`, `log_deletion`), with "via API" in the
-  change message, so the admin's history shows API changes.
+  (`log_addition`, `log_change`, `log_deletions`), the change message
+  followed by "(Through the API.)", so the admin's history shows API
+  changes.
 
 ## Settings
 
@@ -600,6 +588,9 @@ FEINCMS3_API = {
     ],
     "DEFAULT_PAGE_SIZE": 50,
     "MAX_PAGE_SIZE": 200,
+    "TOKEN_LIFETIME": timedelta(hours=8),
+    "UPLOAD_LIFETIME": timedelta(days=1),
+    "UPLOAD_STORAGE": "default",
 }
 ```
 
@@ -617,80 +608,18 @@ with feincms3-data, translates the strings with a file-based workflow or the
 Claude API, and loads the copies as inactive objects with its own loader. It
 stays in the incubator as it is for now.
 
-**The goal: autotranslate acts through the API.** Reading the source in the
-API's wire format instead of a feincms3-data dump, and creating the copies
-through the service layer instead of its own loader, so translated copies
-get the admin's validation, permissions and `LogEntry` like any other
-change. What stays autotranslate's own: choosing the strings (from the
-kinds), calling the translator, the glossary, the review file, mapping
-references to their counterparts. What goes: the dump format,
-`translated.json`, most of `loader.py` (save order, `full_clean()`, the
-per-model rewriting).
-
-Over HTTP, translating is smaller still, e.g. as an agent skill: read the
-source page, translate the strings the schema marks `text` and `html`, keep
-`machine`, map `link`s and references through `translation_of` and
-`pages/find/`, then `POST` the copy inactive with `translation_of` set,
-`dry_run=true` first. Page by page, reviewed in the admin. The API needs
-nothing translation-specific for it beyond the `translation_of` filter and
-the kinds.
-
-## Layout
-
-- `feincms3_api/`: the package. The introspection moves here from
-  autotranslate step by step: `fields.py` (kinds, schema walking, path
-  notation, `iter_path`), `datasets.specs_for_plugins` (plugin discovery),
-  `links.py` (first-party URLs), the path scope of the three page shapes.
-- `feincms3_api/incubator/autotranslate/`: the rest of autotranslate, its
-  own app (label `feincms3_autotranslate`), the `[anthropic]` extra, the
-  `FEINCMS3_AUTOTRANSLATE` setting.
-- `specs/`: this file.
+The goal is autotranslate acting through the API: reading the source in
+the wire format and creating the copies through the operations, so they get
+the admin's validation, permissions and history like any other change
+([#7](https://github.com/feincms/feincms3-api/issues/7)). Over HTTP,
+translating needs nothing translation-specific beyond the `translation_of`
+filter and the kinds: read the source page, translate the strings the
+schema marks `text` and `html`, keep `machine`, map links and references
+through `translation_of` and `pages/find/`, then create the copy inactive
+with `translation_of` set, a dry run first.
 
 **Incubator** means: in the repository and tested, not documented as part
-of the package, no stability promise, may be removed. Its tests stay, since
-its test app is a good base for the API's own. It either graduates (rebuilt
-on the service layer) or goes away in favour of a skill.
-
-Nothing imports from a project; the test app has feincms3 pages, JSON
-plugins and cabinet.
-
-## Order of work
-
-0. The repository: autotranslate moved into the incubator, setup, credits.
-   Done.
-1. Read side: resources, codecs on top of the core, default and JSON
-   adapters, `/schema/` with the kinds, `GET` list and detail, the
-   snapshot command. Done, with session auth. Left for later: tokens,
-   references inside JSON data (`foreign_key_paths`, now `machine`
-   strings), JSON paths in the `EXCLUDE_FIELDS` check, trying it against a
-   real site's content.
-2. Writes, the service layer first and endpoints around it: object
-   `PATCH`/`POST`, content `PUT`, plugin `PATCH`, dry run, ETags,
-   `LogEntry`, error paths. Done. Fields go into the admin's forms through
-   a widget which hands values to the fields' `clean()` as they are (the
-   admin's widgets expect HTML form data). Read-only fields may be written
-   back unchanged; values hidden by `EXCLUDE_FIELDS` inside JSON data are
-   kept by their position. Change messages are the admin's, followed by
-   "(Through the API.)".
-3. Pages (tree, move, find, translations filter), uploads and file fields,
-   cabinet (files, folders, unused files). All done but unused files; moving
-   needed nothing beyond the admin's form, the translations filter is the
-   default `translation_of` filter.
-4. feincms3-sites and feincms3-language-sites test apps. Done: `find/`
-   with `host=`, the scope read from `unique_together`. Found on the way:
-   neither feincms3 nor Django's unique check refuses a new page whose
-   path is taken (feincms3 checks existing pages only, Django skips
-   `("site", "path")` since `site` isn't a form field), so the admin
-   answers with a 500. Fixed upstream in feincms3 7.1 and feincms3-sites
-   0.23, which the API requires.
-5. First alpha; a second project; autotranslate on the service layer
-   (graduating from the incubator), a translating skill over HTTP.
-6. Later, maybe: typed OpenAPI, i.e. components generated from the types'
-   JSON schemas at startup (as a superuser sees them), with plugins as a
-   union on `type`; until then OpenAPI has `fields` and `content` as plain
-   objects, and `/schema/{type}/` has the real shapes. A CLI or MCP server
-   on top (as Wagtail did with `wagtail-cli`, `wagtail-mcp`); Markdown for
-   rich text; revisions.
+of the package, no stability promise, may be removed.
 
 ## Out of scope and rejected alternatives
 
@@ -698,26 +627,14 @@ plugins and cabinet.
   server-side; a delivery API has other concerns (caching, rendering
   plugins to HTML, published-only). Possible later on the same codecs.
 - **Drafts, revisions, workflows.** See "Drafts".
-- **Rich text as Markdown.** HTML is what's stored and what the
-  prose-editor field validates. Markdown in and out, as Wagtail offers, can
-  come later as `?rich_text_format=markdown`, converted on the server.
+- **Rich text as Markdown** in the stored data: HTML is what's stored and
+  what the prose-editor field validates. Converting on the way in and out
+  is [#4](https://github.com/feincms/feincms3-api/issues/4).
 - **Copy and translate endpoints** (Wagtail has `copy_for_translation`).
   Translating is built on plain reads and creates, see "Translating".
 - **Generic CRUD for any model.** Only registered resources.
 - **JSON Patch, GraphQL.** Region replacement and the plugin `PATCH` cover
   the edits; GraphQL buys nothing for writes.
-
-## Decided
-
-- **The name** is feincms3-api.
-- **A token model ships with the package.**
-- **Content is flat**, with `depth`; nested only as a read option.
-- **List filters are declared on the resource** (`filters=`), not taken
-  from the admin's `list_filter`: its entries can be arbitrary
-  `SimpleListFilter`s, and the admin's use case (narrowing a list for a
-  person) isn't the API's.
-- **First uses:** both an importer for a relaunch and a site that's already
-  built.
 
 ## Credits
 

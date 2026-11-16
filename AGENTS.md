@@ -13,27 +13,23 @@
 
 ## Layout
 
-- `specs/api.md`: the spec. Read it before working on the API, and keep it
-  up to date when decisions change.
+- `specs/api.md`: the design and the reasoning behind it. Read it before
+  working on the API, and keep it up to date when decisions change. It
+  describes what is, not a backlog: plans and ideas are GitHub issues
+  (`gh issue create`), linked from the spec where it helps.
+- `docs/architecture.md`: how the code is organised, module by module, and
+  where projects plug in. Keep it up to date when modules or their roles
+  change.
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
-  `api.py` (`ContentAPI`: registration, put together from the operation
-  mixins in `reading.py`, `schema.py` and `writing.py`), `content.py`
-  (planning a write: what happens to every inline row), `formsets.py` (the
-  rows bound to the admin's formsets), `http.py` (the ninja routes around the
-  operations), `resources.py` (what's read from the admin), `adapters.py`
-  (an object's or plugin's `fields`, binding them to admin forms),
-  `codecs.py` (one form field in wire format and JSON schema),
-  `references.py` (`?expand=references`), `errors.py`,
-  `models.py`, `auth.py` and `admin.py` (API tokens), `cabinet.py` and
-  `forms.py` (resources for django-cabinet and feincms3-forms), `kinds.py` and
-  `paths.py` (from autotranslate).
 - `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
-  regenerate it with `.venv/bin/python tests/manage.py f3api_schema >
-  tests/testapp/snapshot.txt` and look at the diff.
+  regenerate it with `.venv/bin/python tests/manage.py f3api_schema
+  testapp.content_api.content_api > tests/testapp/snapshot.txt` and look at
+  the diff.
 - `feincms3_api/incubator/`: code which may become part of the package or go
   away; tested, not documented as part of the package, no stability promise.
   `incubator/autotranslate/` is feincms3-autotranslate, its app label stays
-  `feincms3_autotranslate`. Its docs are in `docs/autotranslate.md`.
+  `feincms3_autotranslate`. Its docs are in `docs/autotranslate.md`; it
+  needs the `autotranslate` extra (feincms3-data).
 
 ## Conventions
 
