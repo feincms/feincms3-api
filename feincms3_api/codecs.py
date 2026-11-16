@@ -434,66 +434,11 @@ if JSONEditorField is not None:
     codecs.register(JSONEditorField, JSONEditorCodec())
 
 
-def describe(name, schema):
-    """
-    Lines for the snapshot: ``name: kind`` for this field and, for JSON data,
-    for every value inside it
-    """
-    suffix = " (read-only)" if schema.get("readOnly") else ""
-    if _is_leaf(schema):
-        return [f"{name}: {_describe_one(schema)}{suffix}"]
-    lines = [f"{name}: json{suffix}"]
-    lines.extend(
-        f"{path}: {_describe_one(sub)}"
-        for path, sub in _leaf_paths(schema, name)
-        if path != name
-    )
-    return lines
-
-
-def _is_leaf(schema):
-    return (
-        REF in schema
-        or schema.get("x-feincms3-file")
-        or schema.get("type") not in {"object", "array"}
-        or (schema.get("type") == "array" and REF in schema.get("items", {}))
-    )
-
-
-def _leaf_paths(schema, prefix):
-    if _is_leaf(schema):
-        yield prefix, schema
-    elif schema.get("type") == "object":
-        for key, sub in schema.get("properties", {}).items():
-            yield from _leaf_paths(sub, f"{prefix}.{key}")
-    elif isinstance(schema.get("items"), dict):
-        yield from _leaf_paths(schema["items"], f"{prefix}[]")
-
-
-def _describe_one(schema):
-    if schema.get("x-feincms3-file"):
-        return "file"
-    if REF in schema:
-        return f"ref {schema[REF]}"
-    if schema.get("type") == "array" and REF in schema.get("items", {}):
-        return f"refs {schema['items'][REF]}"
-    if KIND in schema:
-        kind = schema[KIND]
-        return "choice" if "enum" in schema and kind == MACHINE else kind
-    if "enum" in schema:
-        return "choice"
-    type = schema.get("type")
-    if isinstance(type, list):
-        type = next((t for t in type if t != "null"), "null")
-    return type or "json"
-
-
 __all__ = [
     "Codec",
     "CodecRegistry",
     "Field",
     "codecs",
-    "describe",
     "label",
     "reference",
     "tokens",
