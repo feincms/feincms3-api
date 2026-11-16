@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.module_loading import import_string
 
-from feincms3_autotranslate.conf import config
+from feincms3_api.incubator.autotranslate.conf import config
 
 
 HREF_RE = re.compile(r"""(<a\b[^>]*?\shref=)(["'])(.*?)\2""", re.IGNORECASE | re.DOTALL)

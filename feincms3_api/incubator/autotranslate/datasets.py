@@ -18,7 +18,7 @@ from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.core.management.base import CommandError
 from django.db import models
 
-from feincms3_autotranslate.conf import first_language
+from feincms3_api.incubator.autotranslate.conf import first_language
 
 
 @dataclasses.dataclass(frozen=True)

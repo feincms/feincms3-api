@@ -11,7 +11,7 @@ import json
 
 from django.utils.module_loading import import_string
 
-from feincms3_autotranslate.conf import config
+from feincms3_api.incubator.autotranslate.conf import config
 
 
 class TranslationError(Exception):

@@ -22,7 +22,7 @@ INSTALLED_APPS = [
     "django_json_schema_editor",
     "feincms3_forms",
     "feincms3_data",
-    "feincms3_autotranslate",
+    "feincms3_api.incubator.autotranslate",
     "testapp",
 ]
 MIDDLEWARE = [

@@ -18,7 +18,7 @@ from html.parser import HTMLParser
 
 from django.utils.text import slugify
 
-from feincms3_autotranslate.fields import CHOICES, HTML, LINK, iter_path, specs_for_raw
+from feincms3_api.incubator.autotranslate.fields import CHOICES, HTML, LINK, iter_path, specs_for_raw
 
 
 OWNER = "object"

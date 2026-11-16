@@ -7,18 +7,18 @@ from pathlib import Path
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
-from feincms3_autotranslate import datasets as ds
-from feincms3_autotranslate.apps import check_field_settings
-from feincms3_autotranslate.backends import TranslationError
-from feincms3_autotranslate.fields import field_specs
-from feincms3_autotranslate.loader import run_from_dumps, run_from_translated
-from feincms3_autotranslate.strings import (
+from feincms3_api.incubator.autotranslate import datasets as ds
+from feincms3_api.incubator.autotranslate.apps import check_field_settings
+from feincms3_api.incubator.autotranslate.backends import TranslationError
+from feincms3_api.incubator.autotranslate.fields import field_specs
+from feincms3_api.incubator.autotranslate.loader import run_from_dumps, run_from_translated
+from feincms3_api.incubator.autotranslate.strings import (
     DumpError,
     check_answer,
     read_dumps,
     split_strings,
 )
-from feincms3_autotranslate.translate import Job
+from feincms3_api.incubator.autotranslate.translate import Job
 from feincms3_data.data import dump_specs
 
 from testapp import models as m
@@ -443,7 +443,7 @@ class RoundTripTests(Fixture):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "plan.json"
             path.write_text(json.dumps(plan))
-            from feincms3_autotranslate.translate import read_plan  # noqa: PLC0415
+            from feincms3_api.incubator.autotranslate.translate import read_plan  # noqa: PLC0415
 
             only = read_plan(path, target="fr")
         self.assertEqual(only, {f"testapp.page.{new.pk}"})
@@ -618,7 +618,7 @@ class NoTranslationOfTests(Fixture):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "load.json"
             path.write_text(json.dumps(log))
-            from feincms3_autotranslate.loader import parse_into  # noqa: PLC0415
+            from feincms3_api.incubator.autotranslate.loader import parse_into  # noqa: PLC0415
 
             into = parse_into([str(path)])
         self.assertEqual(into, {("testapp.training", self.training.pk): copy.pk})
@@ -763,7 +763,7 @@ class CommandTests(Fixture):
         with (
             override_settings(
                 FEINCMS3_AUTOTRANSLATE={
-                    "BACKEND": "feincms3_autotranslate.backends.anthropic.Anthropic"
+                    "BACKEND": "feincms3_api.incubator.autotranslate.backends.anthropic.Anthropic"
                 }
             ),
             tempfile.TemporaryDirectory() as tmp,
@@ -808,7 +808,7 @@ class AnthropicTests(TestCase):
     def backend(self, *answers):
         from unittest import mock  # noqa: PLC0415
 
-        from feincms3_autotranslate.backends.anthropic import Anthropic  # noqa: PLC0415
+        from feincms3_api.incubator.autotranslate.backends.anthropic import Anthropic  # noqa: PLC0415
 
         backend = Anthropic(model="some-model")
         messages = iter(answers)

@@ -8,7 +8,7 @@ HTML, django-json-schema-editor data contributes its string properties, and
 feincms3-forms fields keep their names, values and defaults.
 
 Link fields (``URLField``, ``url``, ``*_url``, ``LINK_FIELDS``) aren't
-translated but mapped, see ``feincms3_autotranslate.links``.
+translated but mapped, see ``feincms3_api.incubator.autotranslate.links``.
 
 Paths go on from the field with dots, and ``[]`` stands for every item of a
 list: ``data.figures[].title``.
@@ -21,8 +21,8 @@ from functools import cache
 from django.apps import apps
 from django.db import models
 
-from feincms3_autotranslate.conf import config
-from feincms3_autotranslate.datasets import is_translated_field, label
+from feincms3_api.incubator.autotranslate.conf import config
+from feincms3_api.incubator.autotranslate.datasets import is_translated_field, label
 
 
 try:

@@ -11,10 +11,10 @@ import copy
 import json
 import os
 
-from feincms3_autotranslate.backends import BackendError, TranslationError
-from feincms3_autotranslate.conf import config, load_glossary
-from feincms3_autotranslate.datasets import registry as default_registry
-from feincms3_autotranslate.strings import (
+from feincms3_api.incubator.autotranslate.backends import BackendError, TranslationError
+from feincms3_api.incubator.autotranslate.conf import config, load_glossary
+from feincms3_api.incubator.autotranslate.datasets import registry as default_registry
+from feincms3_api.incubator.autotranslate.strings import (
     DumpError,
     all_objects,
     apply_strings,
@@ -84,7 +84,7 @@ class Job:
 
     def prepare(self):
         """The strings file for a person or an agent to translate"""
-        from feincms3_autotranslate.backends import rules  # noqa: PLC0415
+        from feincms3_api.incubator.autotranslate.backends import rules  # noqa: PLC0415
 
         objects = {}
         any_html = False

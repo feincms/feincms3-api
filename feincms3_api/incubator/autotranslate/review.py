@@ -7,7 +7,7 @@ from django.apps import apps
 from django.urls import NoReverseMatch, reverse
 from django.utils.html import escape
 
-from feincms3_autotranslate.strings import Unit, object_strings, unit_title
+from feincms3_api.incubator.autotranslate.strings import Unit, object_strings, unit_title
 
 
 STYLE = """

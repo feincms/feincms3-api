@@ -3,7 +3,8 @@ from django.core import checks
 
 
 class Feincms3AutotranslateConfig(AppConfig):
-    name = "feincms3_autotranslate"
+    name = "feincms3_api.incubator.autotranslate"
+    label = "feincms3_autotranslate"
     verbose_name = "feincms3-autotranslate"
 
     def ready(self):
@@ -24,8 +25,8 @@ def _resolve(entry):
 
 
 def check_field_settings(app_configs=None, **kwargs):
-    from feincms3_autotranslate.conf import config  # noqa: PLC0415
-    from feincms3_autotranslate.fields import all_paths  # noqa: PLC0415
+    from feincms3_api.incubator.autotranslate.conf import config  # noqa: PLC0415
+    from feincms3_api.incubator.autotranslate.fields import all_paths  # noqa: PLC0415
 
     errors = []
     for setting in ("EXCLUDE_FIELDS", "LINK_FIELDS"):

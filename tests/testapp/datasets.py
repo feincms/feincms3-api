@@ -1,4 +1,4 @@
-from feincms3_autotranslate.datasets import (
+from feincms3_api.incubator.autotranslate.datasets import (
     language_regions_dataset,
     object_dataset,
     page_tree_dataset,

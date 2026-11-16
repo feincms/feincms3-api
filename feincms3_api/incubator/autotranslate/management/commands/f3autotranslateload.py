@@ -2,13 +2,13 @@ import json
 
 from django.core.management.base import BaseCommand, CommandError
 
-from feincms3_autotranslate.loader import (
+from feincms3_api.incubator.autotranslate.loader import (
     parse_into,
     read_translated,
     run_from_dumps,
     run_from_translated,
 )
-from feincms3_autotranslate.strings import DumpError, read_dumps
+from feincms3_api.incubator.autotranslate.strings import DumpError, read_dumps
 
 
 class Command(BaseCommand):

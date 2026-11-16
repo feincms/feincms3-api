@@ -14,14 +14,14 @@ overloads and server errors are retried by the SDK (``max_retries``).
 
 import json
 
-from feincms3_autotranslate.backends import (
+from feincms3_api.incubator.autotranslate.backends import (
     BackendError,
     TranslationError,
     parse_answer,
     rules,
 )
-from feincms3_autotranslate.conf import config
-from feincms3_autotranslate.strings import split_strings
+from feincms3_api.incubator.autotranslate.conf import config
+from feincms3_api.incubator.autotranslate.strings import split_strings
 
 
 class Anthropic:

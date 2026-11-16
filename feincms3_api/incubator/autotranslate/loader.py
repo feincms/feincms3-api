@@ -23,8 +23,8 @@ from django.db import DatabaseError, transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils.text import slugify
 
-from feincms3_autotranslate.conf import first_language
-from feincms3_autotranslate.datasets import (
+from feincms3_api.incubator.autotranslate.conf import first_language
+from feincms3_api.incubator.autotranslate.datasets import (
     _describe,
     has_field,
     has_unique_slug,
@@ -33,21 +33,21 @@ from feincms3_autotranslate.datasets import (
     registry as default_registry,
     translated_fields,
 )
-from feincms3_autotranslate.fields import (
+from feincms3_api.incubator.autotranslate.fields import (
     HTML,
     LINK,
     field_specs,
     iter_path,
     json_proxies,
 )
-from feincms3_autotranslate.links import (
+from feincms3_api.incubator.autotranslate.links import (
     host_of,
     map_html,
     page_location,
     path_scope,
     split_url,
 )
-from feincms3_autotranslate.strings import (
+from feincms3_api.incubator.autotranslate.strings import (
     OWNER,
     REGIONS,
     DumpError,

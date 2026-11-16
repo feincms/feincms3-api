@@ -1,4 +1,6 @@
-# feincms3-autotranslate
+# feincms3-api incubator: autotranslate
+
+Part of the incubator (see the README): no promise of stability.
 
 Copy feincms3 content into another language: dump it with
 [feincms3-data](https://github.com/matthiask/feincms3-data), machine-translate
@@ -24,10 +26,10 @@ editors review in the admin before switching them on.
 ## Setup
 
 ```python
-INSTALLED_APPS += ["feincms3_data", "feincms3_autotranslate"]
+INSTALLED_APPS += ["feincms3_data", "feincms3_api.incubator.autotranslate"]
 FEINCMS3_DATA_DATASETS = "app.f3datasets.datasets"
 FEINCMS3_AUTOTRANSLATE = {
-    "BACKEND": "feincms3_autotranslate.backends.anthropic.Anthropic",
+    "BACKEND": "feincms3_api.incubator.autotranslate.backends.anthropic.Anthropic",
     "MODEL": "…",  # required by the anthropic backend, there is no default
     "GLOSSARY": BASE_DIR / "conf" / "translate_glossary.toml",
     "INSTRUCTIONS": "Formal register.",
@@ -38,7 +40,7 @@ FEINCMS3_AUTOTRANSLATE = {
 
 ```python
 # app/f3datasets.py
-from feincms3_autotranslate.datasets import (
+from feincms3_api.incubator.autotranslate.datasets import (
     language_regions_dataset,
     object_dataset,
     page_tree_dataset,
@@ -166,7 +168,7 @@ getting a `-2` suffix. Delete the old copy first, or name it with
   `--prepare` writes `strings-1.json`, `strings-2.json`, … of at most N
   characters each, every one with the rules, to be translated in parallel;
   `--apply` takes them all.
-- **anthropic** (`feincms3-autotranslate[anthropic]`): the Claude API, one
+- **anthropic** (`feincms3-api[anthropic]`): the Claude API, one
   request per object (split by size when needed). A cut-off, refused or
   invalid answer fails the object; the next run translates it again. Answers
   are written to `<output>.partial` as they arrive, and `--resume` continues

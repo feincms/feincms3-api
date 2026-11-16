@@ -3,12 +3,12 @@ import os
 
 from django.core.management.base import BaseCommand, CommandError
 
-from feincms3_autotranslate.backends import BackendError, get_backend
-from feincms3_autotranslate.datasets import registry
-from feincms3_autotranslate.fields import list_fields
-from feincms3_autotranslate.review import review_html
-from feincms3_autotranslate.strings import DumpError, read_dumps
-from feincms3_autotranslate.translate import (
+from feincms3_api.incubator.autotranslate.backends import BackendError, get_backend
+from feincms3_api.incubator.autotranslate.datasets import registry
+from feincms3_api.incubator.autotranslate.fields import list_fields
+from feincms3_api.incubator.autotranslate.review import review_html
+from feincms3_api.incubator.autotranslate.strings import DumpError, read_dumps
+from feincms3_api.incubator.autotranslate.translate import (
     Job,
     read_answers,
     read_plan,
