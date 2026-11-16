@@ -25,6 +25,10 @@ editors review in the admin before switching them on.
 
 ## Setup
 
+```bash
+pip install "feincms3-api[autotranslate]"  # [autotranslate,anthropic] for the Claude API
+```
+
 ```python
 INSTALLED_APPS += ["feincms3_data", "feincms3_api.incubator.autotranslate"]
 FEINCMS3_DATA_DATASETS = "app.f3datasets.datasets"

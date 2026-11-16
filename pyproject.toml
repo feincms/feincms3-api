@@ -14,6 +14,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 classifiers = [
+  "Development Status :: 3 - Alpha",
   "Environment :: Web Environment",
   "Framework :: Django",
   "Intended Audience :: Developers",
@@ -32,10 +33,12 @@ dependencies = [
   "django-content-editor>=10",
   "django-ninja>=1.4",
   "feincms3>=7.1",
-  "feincms3-data>=0.11",
 ]
 optional-dependencies.anthropic = [
   "anthropic>=0.70",
+]
+optional-dependencies.autotranslate = [
+  "feincms3-data>=0.11",
 ]
 optional-dependencies.tests = [
   "coverage",
