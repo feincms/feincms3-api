@@ -2,6 +2,8 @@
 
 ## Next version
 
+- Added `pages/find/?path=…`. Pages are moved by changing `parent` and
+  `position`.
 - Added staged uploads: `POST /uploads/` stores a file for a day
   (`UPLOAD_LIFETIME`), a write names it as `{"upload": id}` in a file field,
   which saves a copy with its own `upload_to`, and the upload is removed

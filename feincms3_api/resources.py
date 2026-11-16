@@ -389,6 +389,13 @@ class Resource:
     def check_delete(self, request, obj):
         """Raise ``ConflictError`` if ``obj`` mustn't be deleted"""
 
+    #: Whether objects can be found by their path (``find/?path=``)
+    findable = False
+
+    def find(self, request, params):
+        """The object at ``params["path"]``, or ``None``"""
+        return
+
 
 class ObjectResource(Resource):
     """Any model, with or without django-content-editor plugins"""
@@ -398,6 +405,17 @@ class PageResource(Resource):
     """feincms3 pages: a tree, with paths"""
 
     filter_fields = (*Resource.filter_fields, "parent", "page_type", "path")
+    findable = True
+
+    def find(self, request, params):
+        path = params.get("path") or ""
+        pages = list(self.get_queryset(request).filter(path=path)[:2])
+        if len(pages) > 1:
+            raise ConflictError(
+                "Several pages have this path (one per site or language?).",
+                pages=[{"type": self.type, "id": page.pk} for page in pages],
+            )
+        return pages[0] if pages else None
 
     def meta(self, request, obj, wire):
         return {"path": obj.path, **super().meta(request, obj, wire)}

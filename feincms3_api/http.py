@@ -46,12 +46,21 @@ def build_router(api):
         return JsonResponse(api.upload(request, file), status=201)
 
     for resource in api.resources:
-        _add_routes(api, router, resource.name)
+        _add_routes(api, router, resource)
     return router
 
 
-def _add_routes(api, router, name):
+def _add_routes(api, router, resource):
+    name = resource.name
     operation = name.replace("-", "_")
+
+    if resource.findable:
+        # Before {pk}/, which would take "find" for an id
+        @router.get(f"{name}/find/", operation_id=f"{operation}_find")
+        @_errors
+        def find(request: HttpRequest):
+            """One object by its ``path``"""
+            return _json(api.find(request, name, request.GET))
 
     @router.get(f"{name}/", operation_id=f"{operation}_list")
     @_errors

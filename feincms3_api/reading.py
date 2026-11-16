@@ -42,6 +42,15 @@ class ReadingMixin:
         self._check_view(request, resource, obj)
         return resource, obj
 
+    def find(self, request, name, params):
+        """An object by its path (pages)"""
+        resource = self.resource(name)
+        self._check_view(request, resource)
+        if (obj := resource.find(request, params)) is None:
+            raise NotFoundError(f"No {resource.type} at {params.get('path')!r}.")
+        self._check_view(request, resource, obj)
+        return resource.read(request, obj, self, nested=_bool(params.get("nested")))
+
     def detail(self, request, name, pk, *, nested=False):
         resource, obj = self._get(request, name, pk)
         return resource.read(request, obj, self, nested=nested)

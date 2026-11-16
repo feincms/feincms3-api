@@ -325,7 +325,6 @@ not the verbose name, which changes with the language):
 | `GET /{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
 | `PATCH /{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
 | `DELETE /{resource}/{id}/` | delete |
-| `POST /pages/{id}/actions/move/` | `parent`, `position` |
 | `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
@@ -407,9 +406,10 @@ transaction) would close that gap over HTTP; later, if it's needed.
   `page_type`/`template_key`, `language_code`; `slug` defaults to
   `slugify(title)`. `path` is computed by `AbstractPage.save()`, never
   written, except as `static_path` with `path` where the admin allows it.
-- **Position** among siblings is `position` as in feincms3; `move` with
-  `parent` and `position` saves through the form too, so descendants' paths
-  are updated by feincms3 as in the admin.
+- **Moving** is a `PATCH` of `parent` and `position` (the position among
+  siblings, as in feincms3), through the admin's form like any change, so
+  feincms3 updates the descendants' paths and refuses a page below itself.
+  No action endpoint of its own.
 - **Page types** come from `TYPES`; the schema lists each with its regions.
   Application types are created like any page; `PageTypeMixin`'s clean
   refuses a second instance of an app namespace, as in the admin.
@@ -604,7 +604,9 @@ plugins and cabinet.
    kept by their position. Change messages are the admin's, followed by
    "(Through the API.)".
 3. Pages (tree, move, find, translations filter), uploads and file fields,
-   cabinet (files, folders, unused files).
+   cabinet (files, folders, unused files). Pages and uploads done; moving
+   needed nothing beyond the admin's form, the translations filter is the
+   default `translation_of` filter.
 4. feincms3-sites and feincms3-language-sites test apps.
 5. First alpha; a second project; autotranslate on the service layer
    (graduating from the incubator), a translating skill over HTTP.
