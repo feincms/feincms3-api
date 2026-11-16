@@ -595,7 +595,9 @@ FEINCMS3_API = {
 ```
 
 `EXCLUDE_FIELDS` entries use the path notation and work for fields and for
-values inside JSON data. One naming a model or field that doesn't exist is a
+values inside JSON data. An excluded field keeps its value on writes; a
+required field without a default therefore makes objects of that type
+impossible to create through the API. One naming a model or field that doesn't exist is a
 system check error (`feincms3_api.E002`), so a typo can't quietly expose a
 field. A resource whose model isn't registered with its admin site is one
 too (`feincms3_api.E001`).
