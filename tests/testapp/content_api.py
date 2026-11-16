@@ -1,0 +1,10 @@
+from feincms3_api.api import ContentAPI
+from feincms3_api.resources import ObjectResource, PageResource
+from testapp.models import Article, Page, TabList, Training
+
+
+content_api = ContentAPI()
+content_api.register(PageResource(Page))
+content_api.register(ObjectResource(Article))
+content_api.register(ObjectResource(TabList, name="tab-lists"))
+content_api.register(ObjectResource(Training))

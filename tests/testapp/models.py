@@ -224,6 +224,17 @@ PageTeaser = JSONPlugin.proxy(
 )
 
 
+class Accordion(PagePlugin):
+    container = True
+
+    title = models.CharField(max_length=100)
+
+
+class Download(PagePlugin):
+    file = models.FileField(upload_to="downloads/")
+    caption = models.CharField(max_length=200, blank=True)
+
+
 class ArticleRichText(ArticlePlugin):
     text = ProseEditorField()
 

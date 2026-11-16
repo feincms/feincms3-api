@@ -18,10 +18,12 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "feincms3",
     "content_editor",
+    "tree_queries",
     "django_prose_editor",
     "django_json_schema_editor",
     "feincms3_forms",
     "feincms3_data",
+    "feincms3_api",
     "feincms3_api.incubator.autotranslate",
     "testapp",
 ]
@@ -44,6 +46,9 @@ TEMPLATES = [
     }
 ]
 ROOT_URLCONF = "testapp.urls"
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
+STATIC_URL = "/static/"
 
 LANGUAGE_CODE = "de"
 LANGUAGES = [("de", "German"), ("fr", "French"), ("it", "Italian")]
@@ -54,6 +59,12 @@ FEINCMS3_AUTOTRANSLATE = {
     "INSTRUCTIONS": "Formal register.",
     "EXCLUDE_FIELDS": [
         "testapp.form.recipient_email",
+        "testapp.jsonplugin_key_figures.data.figures[].unit",
+    ],
+}
+FEINCMS3_API = {
+    "EXCLUDE_FIELDS": [
+        "testapp.training.slug",
         "testapp.jsonplugin_key_figures.data.figures[].unit",
     ],
 }

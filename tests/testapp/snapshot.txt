@@ -1,0 +1,79 @@
+testapp.accordion (plugin of testapp.page, container)
+  title: text
+testapp.article (resource articles)
+  language_code: choice
+  translation_of: ref testapp.article
+  is_active: boolean
+  title: text
+  slug: machine
+  lead: text
+  tags: refs testapp.tag
+  teaser_page: ref testapp.page
+  region main: testapp.articlerichtext, testapp.articlebutton
+testapp.articlebutton (plugin of testapp.article)
+  button_label: text
+  button_page: ref testapp.page
+testapp.articlerichtext (plugin of testapp.article)
+  text: html
+testapp.button (plugin of testapp.page)
+  button_label: text
+  style: choice
+  button_url: link
+  button_page: ref testapp.page
+testapp.contact (plugin of testapp.page)
+  person: ref testapp.person
+testapp.download (plugin of testapp.page)
+  file: file
+  caption: text
+testapp.formcontainer (plugin of testapp.page)
+  form: ref testapp.form
+testapp.jsonplugin_anchor (plugin of testapp.page)
+  data: json
+  data.title: text
+  data.id: machine
+  data.layout: choice
+testapp.jsonplugin_key_figures (plugin of testapp.page)
+  data: json
+  data.title: text
+  data.figures[].title: text
+  data.figures[].number: number
+  data.button_url: link
+testapp.jsonplugin_page_teaser (plugin of testapp.page)
+  data: json
+  data.title: text
+  data.page: machine
+testapp.page (resource pages)
+  parent: ref testapp.page
+  position: integer
+  menu: choice
+  language_code: choice
+  translation_of: ref testapp.page
+  redirect_to_url: link
+  redirect_to_page: ref testapp.page
+  page_type: choice
+  is_active: boolean
+  title: text
+  slug: machine
+  static_path: boolean
+  lead: html
+  path: machine (read-only)
+  region standard.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
+  region articles.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
+testapp.richtext (plugin of testapp.page)
+  text: html
+testapp.tab (plugin of testapp.tablist)
+  title: text
+  text: html
+  button_page: ref testapp.page
+testapp.tablist (resource tab-lists)
+  title: text
+  region de: testapp.tab
+  region fr: testapp.tab
+  region it: testapp.tab
+testapp.tablistelement (plugin of testapp.page)
+  tab_list: ref testapp.tablist
+testapp.training (resource trainings)
+  language_code: choice
+  is_active: boolean
+  title: text
+  contents: html

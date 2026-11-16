@@ -103,8 +103,9 @@ Form submissions, users, orders stay out by construction.
 
 ```python
 # app/content_api.py
-from feincms3_api import ContentAPI, ObjectResource, PageResource
+from feincms3_api.api import ContentAPI
 from feincms3_api.cabinet import CabinetResource
+from feincms3_api.resources import ObjectResource, PageResource
 
 from articles.models import Article
 from events.models import Event
@@ -226,12 +227,13 @@ codec without being registered.
 | django-imagefield `PPOIField` | `"0.5x0.5"` | `pattern` |
 | `FileField`, `ImageField` (the object's own file) | `{"name", "url"}`; written as `{"upload": id}` | `x-feincms3-file` |
 
-**Text for people.** Every string in the schema also says what it is, as
-autotranslate's `fields.py` decides today: `"x-feincms3-kind"` is `text`,
-`html`, `link` or `machine` (slugs, paths, choices, enums, anything with a
-`pattern`, feincms3-forms field names). That's what a translating agent
-(see "Translating") or a spell checker needs to know, and the snapshot
-shows it.
+**Text for people.** Every string in the schema also says what it is
+(`feincms3_api.kinds`, from autotranslate's `fields.py`): `"x-feincms3-kind"`
+is `text`, `html`, `link`, `machine` (slugs, paths, choices, enums, anything
+with a `pattern`, feincms3-forms field names) or `choices` (a feincms3-forms
+choice list, `value|label` lines of which only the labels are text). That's
+what a translating agent (see "Translating") or a spell checker needs to
+know, and the snapshot shows it.
 
 A form field without a codec isn't guessed at: the field is left out, and
 `/schema/` and the snapshot list it as excluded, naming the form field
@@ -267,26 +269,42 @@ An adapter has three methods, `to_wire(obj)`, `to_form_data(value,
 instance)` and `json_schema()`; anything shaped very differently (a plugin
 storing a list in a `TextField`) subclasses it.
 
-**The snapshot.** `./manage.py f3api_schema` prints every registered type
-with its fields and their kinds, like autotranslate's `--list-fields`. The
-project commits it as a snapshot test: a new plugin or field becomes
-writable through the API only after someone has looked at the diff.
+**The snapshot.** `./manage.py f3api_schema [dotted.path.to.api]` prints
+every type with its fields and their kinds, as a superuser sees them, like
+autotranslate's `--list-fields`. The project commits it as a snapshot test:
+a new plugin or field becomes visible through the API only after someone
+has looked at the diff.
 
 ```
-pages.page
-  title, slug, page_type (choice), parent (ref pages.page), lead (html), …
-  regions by page type: standard: main; landing: hero, main; …
-pages.jsonplugin_key_figures (json-schema-editor)
-  data.title, data.figures[].title, data.figures[].description, …
-pages.button
-  button_label, button_url (link), button_page (ref pages.page)
+pages.button (plugin of pages.page)
+  button_label: text
+  button_url: link
+  button_page: ref pages.page
+pages.jsonplugin_key_figures (plugin of pages.page)
+  data: json
+  data.title: text
+  data.figures[].title: text
+  data.figures[].number: number
+pages.page (resource pages)
+  parent: ref pages.page
+  page_type: choice
+  title: text
+  lead: html
+  path: machine (read-only)
+  excluded: header_video (no codec for VideoField)
+  region standard.main: pages.richtext, pages.button, …
+  region landing.hero: pages.teaser
 ```
+
+**Read-only fields** are the admin's `readonly_fields`, marked `readOnly` in
+the schema and returned like the others. A user who may only view an object
+gets every field read-only, as the admin shows it.
 
 ## Endpoints
 
 Under the project's mount point, `{resource}` being the resource's name
-(`pages`, `articles`, …, default: the model's `model_name` pluralised, or
-`name=`):
+(`pages`, `articles`, …, default: the model name with an `s`, or `name=`;
+not the verbose name, which changes with the language):
 
 | | |
 |---|---|
@@ -462,8 +480,11 @@ format. Not v1.
 
 ## Authentication and permissions
 
-- **Bearer tokens** for scripts and agents, **session** for the docs page
-  and for calls from the admin. Tokens first, since session auth fails
+- `ContentAPI(auth=…)` takes django-ninja auth classes; the default is
+  ninja's `SessionAuthIsStaff`, which is enough for the docs page and calls
+  from the admin.
+- **Bearer tokens** for scripts and agents: not built yet (see "Open
+  questions"). Tokens come first in the list, since session auth fails
   without a CSRF token.
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
@@ -482,14 +503,16 @@ FEINCMS3_API = {
         "forms.configuredform.recipient_email",
         "pages.jsonplugin_key_figures.data.internal_note",
     ],
-    "READONLY_FIELDS": [],  # beyond the admin's readonly_fields
+    "DEFAULT_PAGE_SIZE": 50,
     "MAX_PAGE_SIZE": 200,
 }
 ```
 
-Entries use the path notation; one naming a model, field or path that
-doesn't exist is a system check error, so a typo can't quietly expose a
-field.
+`EXCLUDE_FIELDS` entries use the path notation and work for fields and for
+values inside JSON data. One naming a model or field that doesn't exist is a
+system check error (`feincms3_api.E002`), so a typo can't quietly expose a
+field. A resource whose model isn't registered with its admin site is one
+too (`feincms3_api.E001`).
 
 ## Translating
 
@@ -542,8 +565,10 @@ plugins and cabinet.
    Done.
 1. Read side: resources, codecs on top of the core, default and JSON
    adapters, `/schema/` with the kinds, `GET` list and detail, the
-   snapshot command. Tried against a real site's content with read-only
-   tokens: already useful for reports and agents.
+   snapshot command. Done, with session auth. Left for later: tokens,
+   references inside JSON data (`foreign_key_paths`, now `machine`
+   strings), JSON paths in the `EXCLUDE_FIELDS` check, trying it against a
+   real site's content.
 2. Writes, the service layer first and endpoints around it: object
    `PATCH`/`POST`, content `PUT`, plugin `PATCH`, dry run, ETags,
    `LogEntry`, error paths.

@@ -29,7 +29,8 @@ classifiers = [
 dynamic = [ "version" ]
 dependencies = [
   "django>=5.2",
-  "django-content-editor>=7",
+  "django-content-editor>=10",
+  "django-ninja>=1.4",
   "feincms3>=5",
   "feincms3-data>=0.11",
 ]
@@ -106,6 +107,10 @@ lint.per-file-ignores."feincms3_api/incubator/*" = [
   # The incubator isn't held to the package's complexity limits
   "N818",
   "PLR09",
+]
+lint.per-file-ignores."tests/*" = [
+  # assertIs(value, True)
+  "FBT003",
 ]
 lint.per-file-ignores."tests/testapp/test_autotranslate.py" = [
   "PLR09",

@@ -16,6 +16,14 @@
 - `specs/api.md`: the spec. Read it before working on the API, and keep it
   up to date when decisions change.
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
+  `api.py` (`ContentAPI`: registration, the operations as plain methods, the
+  ninja router around them), `resources.py` (what's read from the admin),
+  `adapters.py` (an object's or plugin's `fields`), `codecs.py` (one form
+  field in wire format and JSON schema), `kinds.py` and `paths.py` (from
+  autotranslate).
+- `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
+  regenerate it with `.venv/bin/python tests/manage.py f3api_schema >
+  tests/testapp/snapshot.txt` and look at the diff.
 - `feincms3_api/incubator/`: code which may become part of the package or go
   away; tested, not documented as part of the package, no stability promise.
   `incubator/autotranslate/` is feincms3-autotranslate, its app label stays
