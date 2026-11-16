@@ -334,7 +334,7 @@ class SchemaTest(APITestCase):
 
     def test_snapshot(self):
         out = io.StringIO()
-        call_command("f3api_schema", stdout=out)
+        call_command("f3api_schema", "testapp.content_api.content_api", stdout=out)
         self.assertEqual(out.getvalue(), SNAPSHOT.read_text())
 
 
@@ -358,7 +358,11 @@ class PermissionTest(APITestCase):
 
     def test_staff_with_page_permissions_only(self):
         user = User.objects.create_user("staff", "", "staff", is_staff=True)
-        user.user_permissions.add(Permission.objects.get(codename="view_page"))
+        user.user_permissions.add(
+            Permission.objects.get(
+                codename="view_page", content_type__app_label="testapp"
+            )
+        )
         self.client.force_login(user)
         data = self.get(f"pages/{self.angebot.pk}/").json()
         # Viewing only: the fields are there, read-only

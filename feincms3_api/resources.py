@@ -389,6 +389,13 @@ class Resource:
     def check_delete(self, request, obj):
         """Raise ``ConflictError`` if ``obj`` mustn't be deleted"""
 
+    def validate_instance(self, obj):
+        """
+        Errors (``[{"path", "message"}]``) the admin's form doesn't find,
+        for ``obj`` as it will be saved
+        """
+        return []
+
     #: Whether objects can be found by their path (``find/?path=``)
     findable = False
 
@@ -407,12 +414,72 @@ class PageResource(Resource):
     filter_fields = (*Resource.filter_fields, "parent", "page_type", "path")
     findable = True
 
+    def path_scope(self):
+        """
+        The fields ``path`` is unique together with, from the model:
+        ``()`` (feincms3), ``("site",)`` (feincms3-sites) or
+        ``("language_code",)`` (feincms3-language-sites)
+        """
+        for fields in self.model._meta.unique_together:
+            if "path" in fields:
+                return tuple(field for field in fields if field != "path")
+        return ()
+
+    def validate_instance(self, obj):
+        """
+        A new page's path clashing with another page's in its scope
+
+        feincms3 computes the path while validating, but only checks clashes
+        for existing pages, and Django's own unique check skips a
+        ``unique_together`` with a field the form doesn't have (``site``,
+        which comes from the parent, or a read-only ``path``).
+        """
+        filters = {"path": obj.path}
+        for field in self.path_scope():
+            if field == "site":
+                filters["site_id"] = obj.site_id or (
+                    obj.parent.site_id if obj.parent_id else None
+                )
+            else:
+                filters[field] = getattr(obj, field)
+        clash = self.model._default_manager.filter(**filters).exclude(pk=obj.pk)
+        if (other := clash.first()) is not None:
+            field = "path" if obj.static_path else "slug"
+            return [
+                {
+                    "path": f"fields.{field}",
+                    "message": f"The path {obj.path} is already used by {other}.",
+                }
+            ]
+        return []
+
+    def scope_for_host(self, host):
+        """The filter for the pages served on ``host``, ``None`` if none are"""
+        scope = self.path_scope()
+        if scope == ("site",):
+            from feincms3_sites.utils import get_site_model  # noqa: PLC0415
+
+            site = get_site_model()._default_manager.for_host(host)
+            return None if site is None else {"site": site}
+        if scope == ("language_code",):
+            from feincms3_language_sites.models import site_for_host  # noqa: PLC0415
+
+            site = site_for_host(host)
+            return None if site is None else {"language_code": site["language_code"]}
+        return {}
+
     def find(self, request, params):
         path = params.get("path") or ""
-        pages = list(self.get_queryset(request).filter(path=path)[:2])
+        queryset = self.get_queryset(request).filter(path=path)
+        if host := params.get("host"):
+            if (scope := self.scope_for_host(host)) is None:
+                return None
+            queryset = queryset.filter(**scope)
+        pages = list(queryset[:2])
         if len(pages) > 1:
             raise ConflictError(
-                "Several pages have this path (one per site or language?).",
+                "Several pages have this path, one per site or language; add"
+                " the host (host=…).",
                 pages=[{"type": self.type, "id": page.pk} for page in pages],
             )
         return pages[0] if pages else None

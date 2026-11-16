@@ -28,6 +28,9 @@ INSTALLED_APPS = [
     "feincms3_api",
     "feincms3_api.incubator.autotranslate",
     "testapp",
+    "feincms3_sites",
+    "sitesapp",
+    "langapp",
 ]
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -54,6 +57,12 @@ STATIC_URL = "/static/"
 
 LANGUAGE_CODE = "de"
 LANGUAGES = [("de", "German"), ("fr", "French"), ("it", "Italian")]
+# feincms3-language-sites
+SITES = {
+    "de": {"host": "example.de"},
+    "fr": {"host": "example.fr"},
+    "it": {"host": "example.it"},
+}
 
 FEINCMS3_DATA_DATASETS = "testapp.datasets.datasets"
 FEINCMS3_AUTOTRANSLATE = {

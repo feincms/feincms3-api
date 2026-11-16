@@ -611,7 +611,12 @@ plugins and cabinet.
    cabinet (files, folders, unused files). All done but unused files; moving
    needed nothing beyond the admin's form, the translations filter is the
    default `translation_of` filter.
-4. feincms3-sites and feincms3-language-sites test apps.
+4. feincms3-sites and feincms3-language-sites test apps. Done: `find/`
+   with `host=`, the scope read from `unique_together`. Found on the way:
+   neither feincms3 nor Django's unique check refuses a new page whose
+   path is taken (feincms3 checks existing pages only, Django skips
+   `("site", "path")` since `site` isn't a form field), so the admin
+   answers with a 500; the API checks it itself.
 5. First alpha; a second project; autotranslate on the service layer
    (graduating from the incubator), a translating skill over HTTP.
 6. Later, maybe: typed OpenAPI, i.e. components generated from the types'

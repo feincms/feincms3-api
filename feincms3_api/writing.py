@@ -8,7 +8,7 @@ dry run, and is logged in the admin's history.
 
 import os
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
 from feincms3_api.adapters import form_errors
@@ -102,6 +102,8 @@ class WritingMixin:
                 if form is not None:
                     if not form.is_valid():
                         errors.extend(form_errors(form, "fields"))
+                    else:
+                        errors.extend(resource.validate_instance(form.instance))
                     # Validating applied the values, e.g. a new page type
                     # with other regions for the content below.
                     target = form.instance
@@ -112,18 +114,13 @@ class WritingMixin:
             if errors:
                 raise ValidationFailedError(errors)
 
-            messages = []
-            if form is not None:
-                target = form.save(commit=False)
-                model_admin.save_model(request, target, form, not adding)
-                form.save_m2m()
-                messages.extend(
-                    model_admin.construct_change_message(request, form, None, adding)
+            try:
+                target, messages, created = self._save(
+                    request, resource, form, plan, target, adding=adding
                 )
-            created = []
-            if plan is not None:
-                created, plan_messages = save_plan(plan, target)
-                messages.extend(plan_messages)
+            except IntegrityError as exc:
+                # What the forms and checks didn't find, the database did.
+                raise ConflictError(f"The database refused the change: {exc}") from exc
             if adding:
                 model_admin.log_addition(request, target, log_message(messages))
             elif messages:
@@ -134,6 +131,21 @@ class WritingMixin:
                 transaction.set_rollback(True)
                 _forget_ids(wire, created, adding)
         return wire
+
+    def _save(self, request, resource, form, plan, target, *, adding):
+        model_admin = resource.model_admin
+        messages, created = [], []
+        if form is not None:
+            target = form.save(commit=False)
+            model_admin.save_model(request, target, form, not adding)
+            form.save_m2m()
+            messages.extend(
+                model_admin.construct_change_message(request, form, None, adding)
+            )
+        if plan is not None:
+            created, plan_messages = save_plan(plan, target)
+            messages.extend(plan_messages)
+        return target, messages, created
 
     def update_plugin(
         self,

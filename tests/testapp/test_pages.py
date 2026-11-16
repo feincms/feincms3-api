@@ -66,3 +66,20 @@ class PagesTest(WriteTestCase):
         )
         data = self.get("pages/", translation_of=self.angebot.pk).json()
         self.assertEqual([item["id"] for item in data["items"]], [self.fr_angebot.pk])
+
+    def test_path_clash(self):
+        response = self.send(
+            "post",
+            "pages/",
+            {
+                "fields": {
+                    "title": "Angebot",
+                    "slug": "angebot",
+                    "parent": self.home.pk,
+                    "language_code": "de",
+                    "page_type": "standard",
+                }
+            },
+        )
+        self.assertEqual(response.status_code, 422, response.content)
+        self.assertEqual(response.json()["errors"][0]["path"], "fields.slug")

@@ -44,6 +44,8 @@ optional-dependencies.tests = [
   "django-prose-editor",
   "django-translated-fields",
   "feincms3-forms",
+  "feincms3-language-sites",
+  "feincms3-sites",
 ]
 urls.Homepage = "https://github.com/feincms/feincms3-api/"
 

@@ -138,7 +138,11 @@ class CreateTest(WriteTestCase):
 
     def test_permission(self):
         user = User.objects.create_user("staff", "", "staff", is_staff=True)
-        user.user_permissions.add(Permission.objects.get(codename="view_page"))
+        user.user_permissions.add(
+            Permission.objects.get(
+                codename="view_page", content_type__app_label="testapp"
+            )
+        )
         self.client.force_login(user)
         response = self.send("post", "pages/", {"fields": {"title": "x"}})
         self.assertEqual(response.status_code, 403)
