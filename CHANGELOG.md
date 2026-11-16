@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.0.1 (2026-11-16)
+
 - Added `?expand=references`: `meta.references` describes everything an
   object refers to (`Resource.describe()`), django-json-schema-editor's
   references inside JSON data included, which the schema now marks.
