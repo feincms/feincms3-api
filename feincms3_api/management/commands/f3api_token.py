@@ -16,9 +16,13 @@ class Command(BaseCommand):
         parser.add_argument(
             "--write", action="store_true", help="Allow changes, not only reading"
         )
-        parser.add_argument("--days", type=int, help="Lifetime in days")
+        parser.add_argument(
+            "--hours",
+            type=int,
+            help="Lifetime in hours (default: TOKEN_LIFETIME)",
+        )
 
-    def handle(self, *, username, name, write, days, **options):
+    def handle(self, *, username, name, write, hours, **options):
         User = get_user_model()  # noqa: N806
         try:
             user = User._default_manager.get_by_natural_key(username)
@@ -30,6 +34,6 @@ class Command(BaseCommand):
             user=user,
             name=name or "management command",
             access=APIToken.Access.WRITE if write else APIToken.Access.READ,
-            expires_at=timezone.now() + timedelta(days=days) if days else None,
+            expires_at=timezone.now() + timedelta(hours=hours) if hours else None,
         )
         self.stdout.write(secret)

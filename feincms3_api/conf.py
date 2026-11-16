@@ -1,3 +1,5 @@
+import datetime as dt
+
 from django.conf import settings
 
 
@@ -7,7 +9,8 @@ DEFAULTS = {
     "EXCLUDE_FIELDS": [],
     "MAX_PAGE_SIZE": 200,
     "DEFAULT_PAGE_SIZE": 50,
-    "TOKEN_LIFETIME_DAYS": 30,
+    # About one editing session; a new token for the next one
+    "TOKEN_LIFETIME": dt.timedelta(hours=8),
 }
 
 

@@ -85,13 +85,13 @@ class TokenTest(TestCase):
         token, _secret = APIToken.objects.create_token(user=self.staff, name="x")
         self.assertAlmostEqual(
             token.expires_at,
-            timezone.now() + timedelta(days=30),
+            timezone.now() + timedelta(hours=8),
             delta=timedelta(minutes=1),
         )
 
     def test_command(self):
         out = io.StringIO()
-        call_command("f3api_token", "staff", "--write", "--days=7", stdout=out)
+        call_command("f3api_token", "staff", "--write", "--hours=2", stdout=out)
         secret = out.getvalue().strip()
         token = APIToken.objects.for_secret(secret)
         self.assertEqual(token.user, self.staff)

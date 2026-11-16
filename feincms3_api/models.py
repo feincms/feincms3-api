@@ -38,7 +38,7 @@ def _hashes(secret):
 
 
 def default_expiry():
-    return timezone.now() + timedelta(days=config()["TOKEN_LIFETIME_DAYS"])
+    return timezone.now() + config()["TOKEN_LIFETIME"]
 
 
 class APITokenQuerySet(models.QuerySet):

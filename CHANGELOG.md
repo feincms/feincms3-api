@@ -3,9 +3,9 @@
 ## Next version
 
 - Added API tokens (`APIToken`): bearer authentication before session
-  authentication, read-only or read-write, expiring after 30 days by
-  default (`TOKEN_LIFETIME_DAYS`). Staff users create their own in the admin, which shows the secret
-  once, or with `./manage.py f3api_token`.
+  authentication, read-only or read-write, expiring after 8 hours by
+  default (`TOKEN_LIFETIME`, a `timedelta`). Staff users create their own in
+  the admin, which shows the secret once, or with `./manage.py f3api_token`.
 - Added the read side of the content API: `ContentAPI` with `PageResource`
   and `ObjectResource`, forms, permissions and plugins taken from the admin,
   `GET` lists and details with the plugins flat with their depth (or

@@ -500,7 +500,7 @@ format. Not v1.
   their own (superusers everyone's) without any model permission, so people
   without server access can get one; the secret is shown once, on a page of
   its own, not in a message (message storage can be a cookie). Or
-  `./manage.py f3api_token USERNAME [--write] [--days N]`, which prints it.
+  `./manage.py f3api_token USERNAME [--write] [--hours N]`, which prints it.
 - **Storing them:** a secret is `f3api_` plus 32 random bytes; only its
   HMAC-SHA256 with `SECRET_KEY` (`salted_hmac`) is stored, and tokens are
   found by it. Not a password hasher: those are slow on purpose, against
@@ -508,7 +508,10 @@ format. Not v1.
   `SECRET_KEY`: a leaked database is useless without it, and rotating it
   without a fallback revokes every token at once. Tokens are also found
   under `SECRET_KEY_FALLBACKS`, and moved to the current key when used.
-  Lifetimes are short: 30 days by default (`TOKEN_LIFETIME_DAYS`).
+  Lifetimes are short: 8 hours by default (`TOKEN_LIFETIME`, a
+  `timedelta`), about one editing session. Logging into the admin (with SSO, where a site has
+  it) and creating a token is the start of a session, e.g. with an agent;
+  raise the lifetime if that proves tiresome.
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.
