@@ -6,6 +6,12 @@ Every string the API exposes has a kind, in the schema as
 ``link``s and keeps ``machine`` strings as they are. ``choices`` is a
 feincms3-forms choice list (``value|label`` lines), of which only the
 labels are text.
+
+``machine`` strings are read by code: slugs and paths, choices, ids,
+anything a pattern constrains. Changing one has effects beyond its wording
+(URLs, links to an anchor, stored form submissions), so it may be changed
+on purpose, e.g. a slug for a translated page, but never as a side effect
+of translating or rewording text.
 """
 
 TEXT = "text"
