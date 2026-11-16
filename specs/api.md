@@ -169,11 +169,15 @@ One object, as `GET /content/pages/17/` returns it:
   },
   "content": {
     "main": [
-      {"type": "pages.richtext", "id": 101,
+      {"type": "pages.richtext", "id": 101, "depth": 0,
        "fields": {"text": "<h2>…</h2><p>…</p>", "is_highlighted": false}},
-      {"type": "pages.jsonplugin_key_figures", "id": 102,
+      {"type": "pages.accordion", "id": 104, "depth": 0,
+       "fields": {"title": "Fragen"}},
+      {"type": "pages.richtext", "id": 105, "depth": 1,
+       "fields": {"text": "<p>Antwort</p>", "is_highlighted": false}},
+      {"type": "pages.jsonplugin_key_figures", "id": 102, "depth": 0,
        "fields": {"data": {"title": "…", "figures": [{"title": "…"}]}}},
-      {"type": "pages.button", "id": 103,
+      {"type": "pages.button", "id": 103, "depth": 0,
        "fields": {"button_label": "Kontakt", "button_url": "",
                   "button_page": {"type": "pages.page", "id": 44}}}
     ]
@@ -185,13 +189,16 @@ One object, as `GET /content/pages/17/` returns it:
   proxy's label (`pages.jsonplugin_key_figures`), as autotranslate's
   `--list-fields` does, so each has its own schema.
 - **`fields`** are the admin form's fields, in wire format (below).
-  `region`, `ordering`, `depth` and `parent` of plugins never appear: they
-  follow from where the plugin is in `content`.
-- **`content`** maps region keys to plugin lists in order. Container plugins
-  (django-content-editor 10, `container = True`) carry their plugins in
-  `"children": […]`; on save, the nesting becomes `depth`. Nested rather
-  than flat-with-`depth` because a flat list with depths is easy to get
-  wrong by hand and by agents, and the API can't tell a mistake from intent.
+  `region`, `ordering` and `parent` of plugins never appear: they follow
+  from where the plugin is in `content`.
+- **`content`** maps region keys to plugin lists in order, flat, each with
+  its `depth`: the plugins following a container plugin
+  (django-content-editor 10, `container = True`) with a greater depth are
+  inside it, as in the database. Flat because it's what scripts filter and
+  map over most easily, and what a write needs anyway. `?nested=true` on
+  reads returns containers with their plugins in `"children": […]` instead
+  (and no `depth`), for clients that want the tree. Writes take the flat
+  form only.
 - **Plugins in regions the object doesn't have** (after a page type change)
   are returned under their region key and listed in `meta.warnings`; the
   admin keeps them too.
@@ -310,7 +317,7 @@ not the verbose name, which changes with the language):
 |---|---|
 | `GET /schema/` | resources, their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
-| `GET /{resource}/` | list: `limit`, `offset`, `q`, filters (`language_code`, `is_active`, `parent`, `path`, `page_type`, `translation_of`, from `list_filter` where possible), `fields=` to thin out |
+| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out |
 | `POST /{resource}/` | create, with or without `content` |
 | `GET /{resource}/{id}/` | one object with its content |
 | `PATCH /{resource}/{id}/` | change fields; `content` if given, see below |
@@ -338,8 +345,10 @@ Lists return `{"count", "items"}`, items without `content` unless
   new plugin.
 - A plugin **without `id`** is created.
 - A plugin of a replaced region **not in the list** is deleted.
-- Order comes from the list (`ordering` 10, 20, …), `depth` from
-  `children`.
+- Order comes from the list (`ordering` 10, 20, …), `depth` from each
+  plugin (default `0`). The depths are checked, not repaired: the first
+  plugin is at depth 0, and a plugin can only be one deeper than a
+  container before it which is still open.
 - Each plugin must be allowed in its region by its inline, and the user
   needs the inline's add/change/delete permission for what happens to it.
 
@@ -483,9 +492,11 @@ format. Not v1.
 - `ContentAPI(auth=…)` takes django-ninja auth classes; the default is
   ninja's `SessionAuthIsStaff`, which is enough for the docs page and calls
   from the admin.
-- **Bearer tokens** for scripts and agents: not built yet (see "Open
-  questions"). Tokens come first in the list, since session auth fails
-  without a CSRF token.
+- **Bearer tokens** for scripts and agents, from a token model in the
+  package (`APIToken`), since the API is tiresome to use without them. The
+  default auth is tokens, then sessions: tokens first, since session auth
+  fails without a CSRF token. `./manage.py f3api_token USERNAME` creates
+  one and prints its secret once; the admin lists and revokes them.
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.
@@ -595,18 +606,17 @@ plugins and cabinet.
 - **JSON Patch, GraphQL.** Region replacement and the plugin `PATCH` cover
   the edits; GraphQL buys nothing for writes.
 
-## Open questions
+## Decided
 
-- Name: `feincms3-api`, `feincms3-content-api`, or something not tied to
-  feincms3 (django-content-editor and django-cabinet work without it)?
-- Token model in the package (convenient for every site) or each project's
-  own auth classes?
-- Nested `children` for containers, as proposed, or flat with `depth` like
-  the database?
-- Should list filters come from the admin's `list_filter`, or be declared on
-  the resource? `list_filter` entries can be arbitrary `SimpleListFilter`s.
-- Where the first use comes from: an importer for a relaunch would test
-  writes much harder than a site that's already built.
+- **The name** is feincms3-api.
+- **A token model ships with the package.**
+- **Content is flat**, with `depth`; nested only as a read option.
+- **List filters are declared on the resource** (`filters=`), not taken
+  from the admin's `list_filter`: its entries can be arbitrary
+  `SimpleListFilter`s, and the admin's use case (narrowing a list for a
+  person) isn't the API's.
+- **First uses:** both an importer for a relaunch and a site that's already
+  built.
 
 ## Credits
 

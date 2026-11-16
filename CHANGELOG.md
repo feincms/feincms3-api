@@ -4,7 +4,8 @@
 
 - Added the read side of the content API: `ContentAPI` with `PageResource`
   and `ObjectResource`, forms, permissions and plugins taken from the admin,
-  `GET` lists and details with nested plugin content, `/schema/` with the
+  `GET` lists and details with the plugins flat with their depth (or
+  nested with `nested=true`), list filters declared on the resource, `/schema/` with the
   kind of every string, and the `f3api_schema` snapshot command.
 - Started feincms3-api from feincms3-autotranslate. The translation pipeline
   lives on in `feincms3_api.incubator.autotranslate`, its app label stays

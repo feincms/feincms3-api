@@ -139,7 +139,7 @@ class ReadTest(APITestCase):
         self.assertEqual(set(data["items"][0]["fields"]), {"title", "slug"})
 
         data = self.get("pages/", content="true", parent=self.home.pk).json()
-        self.assertEqual(len(data["items"][0]["content"]["main"]), 5)
+        self.assertEqual(len(data["items"][0]["content"]["main"]), 6)
 
     def test_detail(self):
         response = self.get(f"pages/{self.angebot.pk}/")
@@ -169,13 +169,14 @@ class ReadTest(APITestCase):
 
         main = data["content"]["main"]
         self.assertEqual(
-            [plugin["type"] for plugin in main],
+            [(plugin["type"], plugin["depth"]) for plugin in main],
             [
-                "testapp.richtext",
-                "testapp.accordion",
-                "testapp.button",
-                "testapp.jsonplugin_key_figures",
-                "testapp.download",
+                ("testapp.richtext", 0),
+                ("testapp.accordion", 0),
+                ("testapp.richtext", 1),
+                ("testapp.button", 0),
+                ("testapp.jsonplugin_key_figures", 0),
+                ("testapp.download", 0),
             ],
         )
         self.assertEqual(
@@ -183,21 +184,13 @@ class ReadTest(APITestCase):
             {
                 "type": "testapp.richtext",
                 "id": self.text.pk,
+                "depth": 0,
                 "fields": {"text": "<p>Hallo</p>"},
             },
         )
-        # The container holds the plugin with the greater depth
         self.assertEqual(main[1]["fields"], {"title": "Fragen"})
-        self.assertEqual(
-            main[1]["children"],
-            [
-                {
-                    "type": "testapp.richtext",
-                    "id": self.inner.pk,
-                    "fields": {"text": "<p>Antwort</p>"},
-                }
-            ],
-        )
+        self.assertEqual(main[2]["id"], self.inner.pk)
+        main = main[:2] + main[3:]
         self.assertEqual(
             main[2]["fields"],
             {
@@ -221,6 +214,31 @@ class ReadTest(APITestCase):
         self.assertTrue(file["name"].startswith("downloads/preise"))
         self.assertEqual(file["url"], f"/media/{file['name']}")
 
+    def test_nested(self):
+        response = self.get(f"pages/{self.angebot.pk}/", nested="true")
+        main = response.json()["content"]["main"]
+        self.assertEqual(len(main), 5)
+        # The container holds the plugin with the greater depth
+        self.assertEqual(
+            main[1],
+            {
+                "type": "testapp.accordion",
+                "id": self.accordion.pk,
+                "fields": {"title": "Fragen"},
+                "children": [
+                    {
+                        "type": "testapp.richtext",
+                        "id": self.inner.pk,
+                        "fields": {"text": "<p>Antwort</p>"},
+                    }
+                ],
+            },
+        )
+        # Same object, same ETag
+        self.assertEqual(
+            response["ETag"], self.get(f"pages/{self.angebot.pk}/")["ETag"]
+        )
+
     def test_etag_changes(self):
         etag = self.get(f"pages/{self.angebot.pk}/")["ETag"]
         self.assertEqual(self.get(f"pages/{self.angebot.pk}/")["ETag"], etag)
@@ -239,6 +257,7 @@ class ReadTest(APITestCase):
                     {
                         "type": "testapp.tab",
                         "id": tabs.testapp_tab_set.get().pk,
+                        "depth": 0,
                         "fields": {"title": "Eins", "text": "", "button_page": None},
                     }
                 ],

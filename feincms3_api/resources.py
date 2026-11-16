@@ -48,20 +48,22 @@ def allowed_types(inlines, region_keys):
     return result
 
 
-def nest(plugins):
+def nest(plugins, containers):
     """
-    ``[(depth, container, wire)]`` in order to a nested list: the plugins
-    following a container with a greater depth are its ``children``
+    A flat plugin list to a nested one: the plugins following a container
+    (a type in ``containers``) with a greater depth are its ``children``
     """
     root = []
     stack = [(-1, root)]
-    for depth, container, wire in plugins:
+    for plugin in plugins:
+        plugin = dict(plugin)  # noqa: PLW2901
+        depth = plugin.pop("depth", 0)
         while stack[-1][0] >= depth:
             stack.pop()
-        stack[-1][1].append(wire)
-        if container:
-            wire["children"] = []
-            stack.append((depth, wire["children"]))
+        stack[-1][1].append(plugin)
+        if plugin["type"] in containers:
+            plugin["children"] = []
+            stack.append((depth, plugin["children"]))
     return root
 
 
@@ -98,15 +100,20 @@ class Resource:
     ``ModelAdmin`` is registered with.
     """
 
-    #: Fields which can be filtered on in lists, if the model has them
+    #: Fields which can be filtered on in lists, if the model has them;
+    #: ``filters=`` replaces them
     filter_fields = ("language_code", "is_active", "translation_of", "site")
 
-    def __init__(self, model, *, name=None, admin_site=None, title_field=None):
+    def __init__(
+        self, model, *, name=None, admin_site=None, title_field=None, filters=None
+    ):
         self.model = model
         # Not the verbose name: URLs mustn't change with the language.
         self.name = name or f"{model._meta.model_name}s"
         self.admin_site = admin_site or admin.site
         self.title_field = title_field
+        if filters is not None:
+            self.filter_fields = tuple(filters)
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.name} {self.type}>"
@@ -254,9 +261,10 @@ class Resource:
         return meta
 
     def read_content(self, request, obj, api, warnings):
+        """``(content, container types)``, the content flat with depths"""
         inlines = self.plugin_inlines(request, obj)
         if not inlines:
-            return None
+            return None, set()
         by_model = {inline.model: inline for inline in inlines}
         lookups = {}
         for inline in inlines:
@@ -288,17 +296,15 @@ class Resource:
             if inline not in contexts:
                 contexts[inline] = self.plugin_context(request, inline, obj, api)
             context = contexts[inline]
-            wire = {
-                "type": context.type,
-                "id": plugin.pk,
-                "fields": api.adapters.lookup(context.type).to_wire(context, plugin),
-            }
             by_region.setdefault(plugin.region, []).append(
-                (
-                    getattr(plugin, "depth", 0),
-                    getattr(type(plugin), "container", False),
-                    wire,
-                )
+                {
+                    "type": context.type,
+                    "id": plugin.pk,
+                    "depth": getattr(plugin, "depth", 0),
+                    "fields": api.adapters.lookup(context.type).to_wire(
+                        context, plugin
+                    ),
+                }
             )
 
         region_keys = [region.key for region in self.regions(obj)]
@@ -309,10 +315,13 @@ class Resource:
                     f"Region {key!r} isn't one of this object's regions;"
                     " its plugins are shown, but not rendered."
                 )
-            content[key] = nest(items)
-        return content
+            content[key] = items
+        containers = {
+            label(model) for model in by_model if getattr(model, "container", False)
+        }
+        return content, containers
 
-    def read(self, request, obj, api, *, content=True):
+    def read(self, request, obj, api, *, content=True, nested=False):
         context = self.context(request, obj, api)
         warnings = []
         wire = {
@@ -320,9 +329,18 @@ class Resource:
             "id": obj.pk,
             "fields": api.adapters.lookup(self.type).to_wire(context, obj),
         }
-        if content and (data := self.read_content(request, obj, api, warnings)):
-            wire["content"] = data
+        containers = set()
+        if content:
+            data, containers = self.read_content(request, obj, api, warnings)
+            if data is not None:
+                wire["content"] = data
+        # The ETag is computed from the flat form, whatever is returned.
         wire["meta"] = self.meta(request, obj, wire) | {"warnings": warnings}
+        if nested and "content" in wire:
+            wire["content"] = {
+                key: nest(plugins, containers)
+                for key, plugins in wire["content"].items()
+            }
         return wire
 
     def read_plugin(self, request, obj, api, type_label, plugin_id):
@@ -344,6 +362,7 @@ class Resource:
                 "type": type_label,
                 "id": plugin.pk,
                 "region": plugin.region,
+                "depth": getattr(plugin, "depth", 0),
                 "fields": api.adapters.lookup(type_label).to_wire(context, plugin),
             }
         return None

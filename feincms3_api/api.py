@@ -77,11 +77,13 @@ class ContentAPI:
             config()["MAX_PAGE_SIZE"],
         )
         offset = _int(params.get("offset"), 0)
-        content = params.get("content", "").lower() in {"1", "true"}
+        content = _bool(params.get("content"))
         only = [field for field in params.get("fields", "").split(",") if field]
         items = []
         for obj in queryset[offset : offset + limit]:
-            wire = resource.read(request, obj, self, content=content)
+            wire = resource.read(
+                request, obj, self, content=content, nested=_bool(params.get("nested"))
+            )
             if only:
                 wire["fields"] = {
                     key: value for key, value in wire["fields"].items() if key in only
@@ -97,9 +99,9 @@ class ContentAPI:
         self._check_view(request, resource, obj)
         return resource, obj
 
-    def detail(self, request, name, pk):
+    def detail(self, request, name, pk, *, nested=False):
         resource, obj = self._get(request, name, pk)
-        return resource.read(request, obj, self)
+        return resource.read(request, obj, self, nested=nested)
 
     def plugin(self, request, name, pk, type_label, plugin_id):
         resource, obj = self._get(request, name, pk)
@@ -205,8 +207,10 @@ class ContentAPI:
         @router.get(f"{name}/{{pk}}/", operation_id=f"{operation}_detail")
         @_errors
         def detail(request, pk: str, response: HttpResponse):
-            """One object with its content"""
-            wire = self.detail(request, name, pk)
+            """One object with its content; ``nested=true`` for a tree"""
+            wire = self.detail(
+                request, name, pk, nested=_bool(request.GET.get("nested"))
+            )
             response["ETag"] = wire["meta"]["etag"]
             return wire
 
@@ -226,6 +230,10 @@ class ContentAPI:
         api = NinjaAPI(**kwargs)
         api.add_router("/", self.router)
         return api
+
+
+def _bool(value):
+    return (value or "").lower() in {"1", "true"}
 
 
 def _int(value, default):
