@@ -495,8 +495,17 @@ format. Not v1.
 - **Bearer tokens** for scripts and agents, from a token model in the
   package (`APIToken`), since the API is tiresome to use without them. The
   default auth is tokens, then sessions: tokens first, since session auth
-  fails without a CSRF token. `./manage.py f3api_token USERNAME` creates
-  one and prints its secret once; the admin lists and revokes them.
+  fails without a CSRF token.
+- **Creating tokens:** in the admin, where every active staff user manages
+  their own (superusers everyone's) without any model permission, so people
+  without server access can get one; the secret is shown once, on a page of
+  its own, not in a message (message storage can be a cookie). Or
+  `./manage.py f3api_token USERNAME [--write] [--days N]`, which prints it.
+- **Storing them:** a secret is `f3api_` plus 32 random bytes; only its
+  SHA-256 is stored, and tokens are found by it. Not a password hasher:
+  those are slow on purpose, against guessable secrets, and every request
+  would pay; not an HMAC with `SECRET_KEY`: it wouldn't make a leaked hash
+  less useless, but rotating the key would invalidate every token.
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.

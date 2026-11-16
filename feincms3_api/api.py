@@ -13,9 +13,9 @@ from django.http import HttpRequest, HttpResponse
 from django.utils.functional import cached_property
 from ninja import NinjaAPI, Router
 from ninja.errors import HttpError
-from ninja.security import SessionAuthIsStaff
 
 from feincms3_api.adapters import AdapterRegistry
+from feincms3_api.auth import default_auth
 from feincms3_api.codecs import codecs as default_codecs, label
 from feincms3_api.conf import config
 from feincms3_api.resources import allowed_types, region_info
@@ -34,7 +34,7 @@ class ForbiddenError(Exception):
 
 class ContentAPI:
     def __init__(self, *, auth=None, codecs=None, adapters=None):
-        self.auth = auth if auth is not None else [SessionAuthIsStaff()]
+        self.auth = auth if auth is not None else default_auth()
         self.codecs = codecs or default_codecs.copy()
         self.adapters = adapters or AdapterRegistry()
         self._resources = {}

@@ -18,6 +18,7 @@
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
   `api.py` (`ContentAPI`: registration, the operations as plain methods, the
   ninja router around them), `resources.py` (what's read from the admin),
+  `models.py`, `auth.py` and `admin.py` (API tokens),
   `adapters.py` (an object's or plugin's `fields`), `codecs.py` (one form
   field in wire format and JSON schema), `kinds.py` and `paths.py` (from
   autotranslate).
