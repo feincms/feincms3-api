@@ -2,6 +2,11 @@
 
 ## Next version
 
+- feincms3-data is only installed with the new `autotranslate` extra, which
+  the incubator's autotranslate needs.
+- Documented the setup in the README, and the code's structure in
+  `docs/architecture.md`.
+
 ## 0.0.1 (2026-11-16)
 
 - Added `?expand=references`: `meta.references` describes everything an
