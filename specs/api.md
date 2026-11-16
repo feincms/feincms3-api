@@ -104,7 +104,7 @@ Form submissions, users, orders stay out by construction.
 ```python
 # app/content_api.py
 from feincms3_api.api import ContentAPI
-from feincms3_api.cabinet import CabinetResource
+from feincms3_api.cabinet import FileResource, FolderResource
 from feincms3_api.resources import ObjectResource, PageResource
 
 from articles.models import Article
@@ -118,7 +118,8 @@ content_api.register(PageResource(Page))
 content_api.register(ObjectResource(Article))
 content_api.register(ObjectResource(Event))
 content_api.register(ObjectResource(TabList, title_field="technical_title"))
-content_api.register(CabinetResource())
+content_api.register(FileResource())
+content_api.register(FolderResource())
 
 # app/api.py: a NinjaAPI of the project's own, or content_api.as_api()
 api.add_router("/content/", content_api.router)
@@ -133,7 +134,7 @@ permissions and plugins come from. A model with plugins but no
 |---|---|---|
 | `PageResource` | feincms3 `AbstractPage` subclasses | tree (`parent`, `position`), `path`, page types and templates, move |
 | `ObjectResource` | any model, with or without plugins | nothing; articles, events, tab lists, forms |
-| `CabinetResource` | django-cabinet `File` and `Folder` | uploads, folder tree |
+| `FileResource`, `FolderResource` | django-cabinet's file model and folders | folder filter; folders get an admin of their own (cabinet has none), with cabinet's form and the folder permissions |
 
 Objects with a region per language (a tab list shared between the
 languages, with regions `de`, `fr`, …, rendering the current language's
@@ -459,15 +460,18 @@ and upload just as well.
 
 ### django-cabinet
 
-- `POST /files/` with `{"upload": "<id>", "folder": …}` plus
-  `image_alt_text`, `caption` and whatever else the cabinet admin form has.
-  Images and downloads are told apart by cabinet as in the admin.
+Nothing cabinet-specific is needed for files: they go through cabinet's
+file admin like any resource, and their `image_file` and `download_file`
+fields take uploads. Cabinet's own validation (exactly one file) applies.
+
+- `POST /files/` with `{"fields": {"folder": …, "image_file": {"upload":
+  "<id>"}, "image_alt_text": …}}`; `?folder=` filters the list.
 - `PATCH /files/{id}/` changes metadata; a new `upload` replaces the file
   under the same id where the model has cabinet's `OverwriteMixin`.
 - `DELETE /files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
 - `GET /files/?unused=true` lists files no registered model refers to, the
-  report people ask for anyway.
+  report people ask for anyway. Not built yet.
 - Folders: a tree of `parent` and `name`; deleting a non-empty folder is
   refused.
 
@@ -604,14 +608,18 @@ plugins and cabinet.
    kept by their position. Change messages are the admin's, followed by
    "(Through the API.)".
 3. Pages (tree, move, find, translations filter), uploads and file fields,
-   cabinet (files, folders, unused files). Pages and uploads done; moving
+   cabinet (files, folders, unused files). All done but unused files; moving
    needed nothing beyond the admin's form, the translations filter is the
    default `translation_of` filter.
 4. feincms3-sites and feincms3-language-sites test apps.
 5. First alpha; a second project; autotranslate on the service layer
    (graduating from the incubator), a translating skill over HTTP.
-6. Later, maybe: a CLI or MCP server on top (as Wagtail did with
-   `wagtail-cli`, `wagtail-mcp`); Markdown for rich text; revisions.
+6. Later, maybe: typed OpenAPI, i.e. components generated from the types'
+   JSON schemas at startup (as a superuser sees them), with plugins as a
+   union on `type`; until then OpenAPI has `fields` and `content` as plain
+   objects, and `/schema/{type}/` has the real shapes. A CLI or MCP server
+   on top (as Wagtail did with `wagtail-cli`, `wagtail-mcp`); Markdown for
+   rich text; revisions.
 
 ## Out of scope and rejected alternatives
 

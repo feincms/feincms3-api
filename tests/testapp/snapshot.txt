@@ -1,3 +1,15 @@
+cabinet.file (resource files)
+  folder: ref cabinet.folder
+  caption: text
+  copyright: text
+  image_file: file
+  image_ppoi: machine
+  image_alt_text: text
+  download_file: file
+  _overwrite: boolean
+cabinet.folder (resource folders)
+  parent: ref cabinet.folder
+  name: text
 testapp.accordion (plugin of testapp.page, container)
   title: text
 testapp.article (resource articles)

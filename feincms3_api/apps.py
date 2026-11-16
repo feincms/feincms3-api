@@ -2,6 +2,7 @@ import contextlib
 
 from django.apps import AppConfig, apps
 from django.core import checks
+from django.core.exceptions import ImproperlyConfigured
 
 
 class Feincms3APIConfig(AppConfig):
@@ -30,7 +31,9 @@ def check_resources(app_configs=None, **kwargs):
     errors = []
     for api in _content_apis():
         for resource in api.resources:
-            if resource.model not in resource.admin_site._registry:
+            try:
+                resource.model_admin  # noqa: B018
+            except ImproperlyConfigured:
                 errors.append(
                     checks.Error(
                         f"{resource.type} is registered with a content API but"

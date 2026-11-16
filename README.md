@@ -11,7 +11,7 @@ For scripts, importers and agents, next to the Django admin, not instead of
 it.
 
 **Status:** early development. Reading and writing objects and their
-content work; uploads, page moves and django-cabinet don't yet. The plan is
+content work, with uploads, pages and django-cabinet. The plan is
 in [specs/api.md](specs/api.md).
 
 ## Incubator

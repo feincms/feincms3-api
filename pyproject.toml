@@ -39,6 +39,7 @@ optional-dependencies.anthropic = [
 ]
 optional-dependencies.tests = [
   "coverage",
+  "django-cabinet",
   "django-json-schema-editor",
   "django-prose-editor",
   "django-translated-fields",

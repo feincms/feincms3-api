@@ -19,6 +19,8 @@ INSTALLED_APPS = [
     "feincms3",
     "content_editor",
     "tree_queries",
+    "cabinet",
+    "imagefield",
     "django_prose_editor",
     "django_json_schema_editor",
     "feincms3_forms",

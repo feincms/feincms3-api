@@ -37,6 +37,12 @@ TEXT_FORMATS = {"textarea": TEXT, "prose": HTML}
 LINK_FORMATS = {"uri", "url", "uri-reference"}
 
 
+def is_machine_name(name):
+    """Names of strings which are never text, whatever their type says"""
+    # django-imagefield's primary points of interest: "0.5x0.5"
+    return name in MACHINE_NAMES or name == "ppoi" or name.endswith("_ppoi")
+
+
 def is_link_name(name):
     """``url`` and ``*_url`` hold a URL, whatever their type"""
     return name == "url" or name.endswith("_url")

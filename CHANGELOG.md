@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Added django-cabinet support: `FileResource` and `FolderResource` in
+  `feincms3_api.cabinet`. Strings named `ppoi` or `*_ppoi` (django-imagefield)
+  are machine strings.
 - Added `pages/find/?path=…`. Pages are moved by changing `parent` and
   `position`.
 - Added staged uploads: `POST /uploads/` stores a file for a day

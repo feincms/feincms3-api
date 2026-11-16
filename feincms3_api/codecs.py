@@ -22,9 +22,9 @@ from feincms3_api.kinds import (
     HTML,
     LINK,
     MACHINE,
-    MACHINE_NAMES,
     TEXT,
     is_link_name,
+    is_machine_name,
     json_string_kind,
     schema_paths,
 )
@@ -103,7 +103,7 @@ def string_kind(field):
     form_field, name = field.form_field, field.name
     if isinstance(form_field, forms.URLField) or is_link_name(name):
         return LINK
-    if name in MACHINE_NAMES or isinstance(
+    if is_machine_name(name) or isinstance(
         form_field,
         (
             forms.SlugField,
