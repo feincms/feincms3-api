@@ -32,13 +32,31 @@ testapp.button (plugin of testapp.page)
   style: choice
   button_url: link
   button_page: ref testapp.page
+testapp.chapter (resource chapters)
+  parent: ref testapp.chapter
+  textbook: ref testapp.textbook
+  title: text
+  position: integer
+  region main: testapp.chaptertext
+testapp.chaptertext (plugin of testapp.chapter)
+  text: html
 testapp.contact (plugin of testapp.page)
   person: ref testapp.person
 testapp.download (plugin of testapp.page)
   file: file
   caption: text
+testapp.form (resource forms)
+  name: text
+  form_type: choice
+  language_code: choice
+  slot: choice
+  recipient_email: text
+  success_message: text
+  region contact.form: testapp.simplefield_text, testapp.simplefield_select, testapp.formrichtext, testapp.rating
 testapp.formcontainer (plugin of testapp.page)
   form: ref testapp.form
+testapp.formrichtext (plugin of testapp.form)
+  text: html
 testapp.jsonplugin_anchor (plugin of testapp.page)
   data: json
   data.title: text
@@ -76,8 +94,30 @@ testapp.person (resource persons)
   role_de: text
   role_fr: text
   role_it: text
+testapp.rating (plugin of testapp.form)
+  name: machine
+  label: text
+  is_required: boolean
+  max_stars: integer
+  help_text: text
 testapp.richtext (plugin of testapp.page)
   text: html
+testapp.simplefield_select (plugin of testapp.form)
+  name: machine
+  label: text
+  is_required: boolean
+  choices: choices
+  help_text: text
+  placeholder: text
+  default_value: machine
+testapp.simplefield_text (plugin of testapp.form)
+  name: machine
+  label: text
+  is_required: boolean
+  help_text: text
+  placeholder: text
+  default_value: machine
+  max_length: integer
 testapp.tab (plugin of testapp.tablist)
   title: text
   text: html
@@ -89,6 +129,8 @@ testapp.tablist (resource tab-lists)
   region it: testapp.tab
 testapp.tablistelement (plugin of testapp.page)
   tab_list: ref testapp.tablist
+testapp.textbook (resource textbooks)
+  title: text
 testapp.training (resource trainings)
   language_code: choice
   is_active: boolean

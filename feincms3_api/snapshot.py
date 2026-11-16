@@ -69,9 +69,15 @@ def _is_leaf(schema):
     return (
         REF in schema
         or schema.get("x-feincms3-file")
-        or schema.get("type") not in {"object", "array"}
+        or not {"object", "array"} & set(_types(schema))
         or (schema.get("type") == "array" and REF in schema.get("items", {}))
     )
+
+
+def _types(schema):
+    """``type`` as a list, it can be one (``"integer"``) or several"""
+    types = schema.get("type")
+    return types if isinstance(types, list) else [types]
 
 
 def _leaf_paths(schema, prefix):

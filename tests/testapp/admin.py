@@ -2,6 +2,11 @@ from content_editor.admin import ContentEditor, ContentEditorInline, deny_region
 from django.contrib import admin
 from django_json_schema_editor.plugins import JSONPluginInline
 from feincms3.admin import TreeAdmin
+from feincms3_forms.admin import (
+    ConfiguredFormAdmin,
+    FormFieldInline,
+    SimpleFieldInline,
+)
 
 from testapp import models
 
@@ -47,3 +52,25 @@ class TrainingAdmin(admin.ModelAdmin):
 
 admin.site.register(models.Tag)
 admin.site.register(models.Person)
+
+
+@admin.register(models.Form)
+class FormAdmin(ConfiguredFormAdmin):
+    inlines = [
+        SimpleFieldInline.create(models.Text),
+        SimpleFieldInline.create(models.Select),
+        ContentEditorInline.create(models.FormRichText),
+        FormFieldInline.create(
+            models.Rating,
+            core_fields=[*FormFieldInline.core_fields, "max_stars"],
+        ),
+    ]
+
+
+@admin.register(models.Chapter)
+class ChapterAdmin(ContentEditor, TreeAdmin):
+    list_display = [*TreeAdmin.list_display, "textbook"]
+    inlines = [ContentEditorInline.create(models.ChapterText)]
+
+
+admin.site.register(models.Textbook)

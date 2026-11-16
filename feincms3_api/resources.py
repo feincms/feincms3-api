@@ -49,6 +49,10 @@ def allowed_types(inlines, region_keys):
     return result
 
 
+def _plugin_order(plugin):
+    return (plugin.region, plugin.ordering, plugin.pk)
+
+
 def nest(plugins, containers):
     """
     A flat plugin list to a nested one: the plugins following a container
@@ -210,16 +214,17 @@ class Resource:
 
     def region_sets(self):
         """
-        The sets of regions an object can have: one per page type or
-        template, or the model's own ``regions``
+        The sets of regions an object can have: one per page type, template
+        or form type (feincms3-forms), or the model's own ``regions``. A form
+        type's regions can depend on the form; those are left out.
         """
-        for attribute in ("TYPES", "TEMPLATES"):
+        for attribute in ("TYPES", "TEMPLATES", "FORMS"):
             if types := getattr(self.model, attribute, None):
                 return [
                     {
                         "key": type.key,
-                        "title": str(type.title),
-                        "regions": type.regions,
+                        "title": str(getattr(type, "title", None) or type.label),
+                        "regions": [] if callable(type.regions) else type.regions,
                     }
                     for type in types
                 ]
@@ -263,28 +268,35 @@ class Resource:
             meta["regions"] = [region_info(region) for region in regions]
         return meta
 
-    def plugins(self, inlines, obj):
+    def plugins(self, request, inlines, obj):
         """
-        ``(visible, hidden)``: the object's plugins in order, those with an
-        inline (as ``(plugin, inline)``) and those without
+        ``(visible, hidden)``: the object's plugins in order, those an inline
+        shows (as ``(plugin, inline)``) and those none does
+
+        The inlines' querysets decide, as in the admin: feincms3-forms'
+        proxies share a table, and each inline shows only its own type.
         """
-        by_model = {inline.model: inline for inline in inlines}
+        visible, hidden = [], []
+        if obj.pk is None:
+            return visible, hidden
+        shown = set()
+        for inline in inlines:
+            for plugin in inline.get_queryset(request).filter(
+                Q(**{inline.fk_name: obj})
+            ):
+                visible.append((plugin, inline))
+                shown.add((plugin._meta.concrete_model, plugin.pk))
         lookups = {}
         for inline in inlines:
             lookups.setdefault(inline.model._meta.concrete_model, inline.fk_name)
-
-        plugins = []
-        if obj.pk is not None:
-            for concrete, fk_name in lookups.items():
-                if hasattr(concrete, "get_queryset"):
-                    queryset = concrete.get_queryset()
-                else:  # pragma: no cover
-                    queryset = concrete._default_manager.all()
-                plugins.extend(queryset.filter(Q(**{fk_name: obj})))
-
-        plugins.sort(key=lambda plugin: (plugin.region, plugin.ordering, plugin.pk))
-        visible = [(p, by_model[type(p)]) for p in plugins if type(p) in by_model]
-        hidden = [p for p in plugins if type(p) not in by_model]
+        for concrete, fk_name in lookups.items():
+            hidden.extend(
+                plugin
+                for plugin in concrete._base_manager.filter(Q(**{fk_name: obj}))
+                if (concrete, plugin.pk) not in shown
+            )
+        visible.sort(key=lambda pair: _plugin_order(pair[0]))
+        hidden.sort(key=_plugin_order)
         return visible, hidden
 
     def read_content(self, request, obj, api, warnings):
@@ -293,7 +305,7 @@ class Resource:
         if not inlines:
             return None, set()
         by_model = {inline.model: inline for inline in inlines}
-        visible, hidden = self.plugins(inlines, obj)
+        visible, hidden = self.plugins(request, inlines, obj)
         if hidden:
             warnings.append(
                 f"{len(hidden)} plugin(s) aren't shown: no inline for their type,"
@@ -361,9 +373,7 @@ class Resource:
             if label(inline.model) != type_label:
                 continue
             model = inline.model
-            queryset = model._meta.concrete_model.get_queryset()
-            if hasattr(model, "TYPE"):
-                queryset = queryset.filter(type=model.TYPE)
+            queryset = inline.get_queryset(request)
             try:
                 plugin = queryset.get(
                     **{inline.fk_name: obj, "pk": model._meta.pk.to_python(plugin_id)}
@@ -408,10 +418,33 @@ class ObjectResource(Resource):
     """Any model, with or without django-content-editor plugins"""
 
 
-class PageResource(Resource):
+class TreeResource(Resource):
+    """
+    A django-tree-queries tree: pages, chapters of a book, categories
+
+    Moved by changing ``parent`` (and ``position``, if the model has one).
+    Deleting a node with children is refused instead of deleting them too.
+    """
+
+    filter_fields = (*Resource.filter_fields, "parent")
+
+    def check_delete(self, request, obj):
+        children = self.model._default_manager.filter(parent=obj)
+        if children.exists():
+            raise ConflictError(
+                f"The {self.model._meta.verbose_name} has children;"
+                " delete or move them first.",
+                children=[
+                    {"type": self.type, "id": child.pk, "title": str(child)}
+                    for child in children
+                ],
+            )
+
+
+class PageResource(TreeResource):
     """feincms3 pages: a tree, with paths"""
 
-    filter_fields = (*Resource.filter_fields, "parent", "page_type", "path")
+    filter_fields = (*TreeResource.filter_fields, "page_type", "path")
     findable = True
 
     def path_scope(self):
@@ -458,14 +491,3 @@ class PageResource(Resource):
 
     def meta(self, request, obj, wire):
         return {"path": obj.path, **super().meta(request, obj, wire)}
-
-    def check_delete(self, request, obj):
-        children = self.model._default_manager.filter(parent=obj)
-        if children.exists():
-            raise ConflictError(
-                "The page has subpages; delete or move them first.",
-                children=[
-                    {"type": self.type, "id": child.pk, "title": str(child)}
-                    for child in children
-                ],
-            )

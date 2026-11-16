@@ -132,9 +132,16 @@ permissions and plugins come from. A model with plugins but no
 
 | Resource | for | adds |
 |---|---|---|
-| `PageResource` | feincms3 `AbstractPage` subclasses | tree (`parent`, `position`), `path`, page types and templates, move |
-| `ObjectResource` | any model, with or without plugins | nothing; articles, events, tab lists, forms |
+| `ObjectResource` | any model, with or without plugins | nothing; articles, blog entries, events, tab lists, feincms3-forms forms |
+| `TreeResource` | django-tree-queries `TreeNode` subclasses | `parent` filter, moved by changing `parent`, deleting a node with children is refused; chapters of a textbook, categories |
+| `PageResource` | feincms3 `AbstractPage` subclasses | a `TreeResource` with `path`, `find/` and sites |
 | `FileResource`, `FolderResource` | django-cabinet's file model and folders | folder filter; folders get an admin of their own (cabinet has none), with cabinet's form and the folder permissions |
+
+Pages are one content model among several: the tests also cover articles,
+feincms3-forms forms (proxy plugins of one table per field type, next to
+plugins of their own, and form types as region sets) and chapters, a tree
+without paths. Which plugins an object has is what the inlines' querysets
+show, as in the admin.
 
 Objects with a region per language (a tab list shared between the
 languages, with regions `de`, `fr`, …, rendering the current language's
@@ -188,7 +195,8 @@ One object, as `GET /content/pages/17/` returns it:
 
 - **`type`** is the model's `label_lower`. JSON plugin proxies use the
   proxy's label (`pages.jsonplugin_key_figures`), as autotranslate's
-  `--list-fields` does, so each has its own schema.
+  `--list-fields` does, so each has its own schema; so do feincms3-forms'
+  field proxies (`forms.simplefield_text`).
 - **`fields`** are the admin form's fields, in wire format (below).
   `region`, `ordering` and `parent` of plugins never appear: they follow
   from where the plugin is in `content`.

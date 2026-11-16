@@ -1,4 +1,5 @@
 from content_editor.models import Region, create_plugin_base
+from django import forms as django_forms
 from django.conf import settings
 from django.db import models
 from django_json_schema_editor.plugins import JSONPluginBase
@@ -13,6 +14,7 @@ from feincms3.mixins import (
 from feincms3.pages import AbstractPage
 from feincms3_forms import models as forms_models
 from translated_fields import TranslatedField
+from tree_queries.models import TreeNode
 
 
 class Page(
@@ -107,6 +109,26 @@ class SimpleField(forms_models.SimpleFieldBase, create_plugin_base(Form)):
 
 Text = SimpleField.proxy(SimpleField.Type.TEXT)
 Select = SimpleField.proxy(SimpleField.Type.SELECT)
+
+
+class FormRichText(create_plugin_base(Form)):
+    """Not a field, between the fields"""
+
+    text = ProseEditorField()
+
+
+class Rating(forms_models.FormField, create_plugin_base(Form)):
+    """A field type of the project's own, not a proxy"""
+
+    max_stars = models.PositiveSmallIntegerField(default=5)
+
+    def get_fields(self, **kwargs):
+        return self.get_field(
+            form_class=django_forms.IntegerField,
+            min_value=1,
+            max_value=self.max_stars,
+            **kwargs,
+        )
 
 
 class Person(models.Model):
@@ -244,3 +266,32 @@ class ArticleButton(ArticlePlugin):
     button_page = models.ForeignKey(
         Page, on_delete=models.CASCADE, blank=True, null=True, related_name="+"
     )
+
+
+class Textbook(models.Model):
+    title = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.title
+
+
+class Chapter(TreeNode):
+    """A tree with content but without paths"""
+
+    textbook = models.ForeignKey(
+        Textbook, on_delete=models.CASCADE, related_name="chapters"
+    )
+    title = models.CharField(max_length=200)
+    position = models.PositiveIntegerField(default=0)
+
+    regions = [Region(key="main", title="Main")]
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self):
+        return self.title
+
+
+class ChapterText(create_plugin_base(Chapter)):
+    text = ProseEditorField()

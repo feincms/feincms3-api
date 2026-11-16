@@ -81,7 +81,7 @@ class _Planner:
         }
         self.region_keys = [region.key for region in resource.regions(obj)]
         self.allowed = allowed_types(inlines, self.region_keys)
-        visible, _hidden = resource.plugins(inlines, obj)
+        visible, _hidden = resource.plugins(request, inlines, obj)
         self.existing = {(label(type(p)), p.pk): p for p, _inline in visible}
         self.used = set()
         self.contexts = {}

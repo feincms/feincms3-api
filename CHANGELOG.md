@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Added `TreeResource` for django-tree-queries trees which aren't pages
+  (chapters, categories); `PageResource` builds on it.
+- Plugins are read through the inlines' querysets, so feincms3-forms' field
+  proxies each show their own fields; form types are region sets.
 - Added feincms3-sites and feincms3-language-sites support: `find/` takes
   `host=` and looks up the page in the host's site or language; the scope
   comes from the page model's `unique_together`. An `IntegrityError`
