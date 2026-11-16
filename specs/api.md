@@ -224,6 +224,7 @@ codec without being registered.
 | django-prose-editor field | HTML string | `contentMediaType: text/html`, allowed tags from the field's extensions |
 | django-json-schema-editor `JSONEditorField` | the JSON value | the field's own schema, `foreign_key_paths` as references |
 | django-imagefield `PPOIField` | `"0.5x0.5"` | `pattern` |
+| `FileField`, `ImageField` (the object's own file) | `{"name", "url"}`; written as `{"upload": id}` | `x-feincms3-file` |
 
 **Text for people.** Every string in the schema also says what it is, as
 autotranslate's `fields.py` decides today: `"x-feincms3-kind"` is `text`,
@@ -232,11 +233,9 @@ autotranslate's `fields.py` decides today: `"x-feincms3-kind"` is `text`,
 (see "Translating") or a spell checker needs to know, and the snapshot
 shows it.
 
-A form field without a codec isn't guessed at: the field is left out, and a
-system check warns, naming model, field and form field class. The project
-registers a codec or excludes the field explicitly. The
-`FileField`/`ImageField` of the feincms3 image plugin is such a case in v1
-(see "Out of scope").
+A form field without a codec isn't guessed at: the field is left out, and
+`/schema/` and the snapshot list it as excluded, naming the form field
+class. The project registers a codec or excludes the field explicitly.
 
 **Adapters** decide a plugin's (or object's) `fields` as a whole. The default
 adapter is the admin form with the codecs, and covers every plugin made of
@@ -245,7 +244,7 @@ ordinary fields without any code, e.g. a button plugin with `button_label`,
 
 - **default** (the form's fields through codecs),
 - **feincms3 plugins**: `RichText`, `HTML`, `External`, `Snippet` (template
-  choices from the model), `Image` read-only for now,
+  choices from the model), `Image` (its own file, see "Files"),
 - **json-schema-editor proxies**: `fields.data` with the proxy's `SCHEMA`;
   the form field validates it, references come from `foreign_key_paths`,
 - **feincms3 mixins on objects**: `page_type`/`template_key` with their
@@ -303,6 +302,7 @@ Under the project's mount point, `{resource}` being the resource's name
 | `DELETE /{resource}/{id}/` | delete |
 | `POST /pages/{id}/actions/move/` | `parent`, `position` |
 | `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
+| `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
 | `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
 
@@ -394,13 +394,49 @@ transaction) would close that gap over HTTP; later, if it's needed.
   other where the model has it; `find` takes `host=`. Path uniqueness is the
   models' business. Tested in step 4, not before.
 
-## Files (django-cabinet)
+## Files
 
-- `POST /files/` is `multipart/form-data`: `file`, `folder`, plus
+Plugins and objects can have file fields of their own (feincms3's `Image`
+plugin has an `ImageField`), or refer to django-cabinet files. Both are
+written the same way, in two steps, so every endpoint but one stays JSON:
+
+1. `POST /uploads/` (`multipart/form-data`, just the file) stores the file
+   and returns `{"upload": "<id>", "name": …, "size": …}`.
+2. The write names it: `{"image": {"upload": "<id>"}}` in a plugin's or
+   object's `fields`. The API passes the file to the admin form as an
+   uploaded file, so the form's own validation runs (allowed types, image
+   checks, django-imagefield's processing) and the field's `upload_to`
+   decides where it ends up.
+
+On read, a file field is `{"name", "url"}` or `null`. On write, leaving the
+field out keeps the file, `null` clears it where the field is optional.
+Writing back what was read (`{"name", "url"}`) keeps it too, so a read,
+change, write round trip doesn't need to know about files.
+
+Uploads belong to the user who made them, are used once, and expire when
+they aren't used (a day by default; a management command removes them).
+They're a staging area: a model of the package (`Upload`: user, file,
+created) whose `FileField` stores into the default storage under
+`feincms3_api/uploads/` (a setting can name another storage). When a write
+uses one, the staged file is opened and handed to the form as an uploaded
+file; the target field then saves it like any upload, with its own
+`upload_to` and storage, and the staged file and its row are deleted. That's
+a copy, not a move: storages have no general move, and `upload_to` may
+depend on the instance, which doesn't exist yet at upload time. The other
+way, multipart writes carrying the JSON and the files together, would make
+every write endpoint deal with multipart.
+
+Uploading from a URL (`{"url": "https://…"}`) is left out: the server
+fetching arbitrary URLs is a request forgery risk, and the client can fetch
+and upload just as well.
+
+### django-cabinet
+
+- `POST /files/` with `{"upload": "<id>", "folder": …}` plus
   `image_alt_text`, `caption` and whatever else the cabinet admin form has.
   Images and downloads are told apart by cabinet as in the admin.
-- `PATCH /files/{id}/` changes metadata; a new `file` replaces the file under
-  the same id where the model has cabinet's `OverwriteMixin`.
+- `PATCH /files/{id}/` changes metadata; a new `upload` replaces the file
+  under the same id where the model has cabinet's `OverwriteMixin`.
 - `DELETE /files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
 - `GET /files/?unused=true` lists files no registered model refers to, the
@@ -408,8 +444,6 @@ transaction) would close that gap over HTTP; later, if it's needed.
 - Folders: a tree of `parent` and `name`; deleting a non-empty folder is
   refused.
 
-Uploads go to cabinet only. A plugin field takes a file reference, never a
-file.
 
 ## Drafts, revisions, publishing
 
@@ -513,8 +547,8 @@ plugins and cabinet.
 2. Writes, the service layer first and endpoints around it: object
    `PATCH`/`POST`, content `PUT`, plugin `PATCH`, dry run, ETags,
    `LogEntry`, error paths.
-3. Pages (tree, move, find, translations filter) and cabinet (uploads,
-   folders, unused files).
+3. Pages (tree, move, find, translations filter), uploads and file fields,
+   cabinet (files, folders, unused files).
 4. feincms3-sites and feincms3-language-sites test apps.
 5. First alpha; a second project; autotranslate on the service layer
    (graduating from the incubator), a translating skill over HTTP.
@@ -527,9 +561,6 @@ plugins and cabinet.
   server-side; a delivery API has other concerns (caching, rendering
   plugins to HTML, published-only). Possible later on the same codecs.
 - **Drafts, revisions, workflows.** See "Drafts".
-- **Uploading files into plugin fields** (feincms3's `Image` plugin has its
-  own `ImageField`): multipart per plugin inside a JSON content document is
-  awkward. Cabinet references instead; the plugin is read-only for now.
 - **Rich text as Markdown.** HTML is what's stored and what the
   prose-editor field validates. Markdown in and out, as Wagtail offers, can
   come later as `?rich_text_format=markdown`, converted on the server.
