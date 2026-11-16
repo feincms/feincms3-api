@@ -506,6 +506,7 @@ format. Not v1.
   those are slow on purpose, against guessable secrets, and every request
   would pay; not an HMAC with `SECRET_KEY`: it wouldn't make a leaked hash
   less useless, but rotating the key would invalidate every token.
+  Lifetimes are short instead: 30 days by default (`TOKEN_LIFETIME_DAYS`).
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.

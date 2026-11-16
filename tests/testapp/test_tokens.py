@@ -85,7 +85,7 @@ class TokenTest(TestCase):
         token, _secret = APIToken.objects.create_token(user=self.staff, name="x")
         self.assertAlmostEqual(
             token.expires_at,
-            timezone.now() + timedelta(days=90),
+            timezone.now() + timedelta(days=30),
             delta=timedelta(minutes=1),
         )
 
