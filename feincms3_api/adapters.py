@@ -11,10 +11,10 @@ import dataclasses
 import re
 
 from django import forms
-from django.core.exceptions import FieldDoesNotExist
-from django.db import models
+from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.db import models, transaction
 
-from feincms3_api.codecs import Field, codecs as default_codecs
+from feincms3_api.codecs import Field, UploadRef, codecs as default_codecs
 from feincms3_api.conf import excluded_paths
 from feincms3_api.errors import WireError
 from feincms3_api.paths import iter_path, tokens
@@ -30,6 +30,7 @@ class Context:
     read_only: tuple = ()
     exclude: frozenset = frozenset()
     codecs: object = default_codecs
+    request: object = None
 
     @property
     def excluded_paths(self):
@@ -103,6 +104,21 @@ def _set_concrete(data, concrete, value):
         node[last] = value
 
 
+def resolve_upload(request, ref):
+    """
+    The uploaded file for a form, and its deletion once the write is
+    committed (a dry run or a failed write keeps it for another try)
+    """
+    from feincms3_api.models import Upload  # noqa: PLC0415
+
+    try:
+        upload = Upload.objects.usable(request.user).get(pk=ref.id)
+    except (Upload.DoesNotExist, ValidationError, ValueError) as exc:
+        raise WireError("No such upload of yours, or it has expired.") from exc
+    transaction.on_commit(upload.discard)
+    return upload.as_file()
+
+
 class FormAdapter:
     def fields(self, context):
         """``(fields, excluded)``: the exposed fields, and why others aren't"""
@@ -171,30 +187,14 @@ class FormAdapter:
             field_path = f"{path}.{name}"
             if (field := by_name.get(name)) is None:
                 errors.append({"path": field_path, "message": "Unknown field."})
-                continue
-            if field.read_only:
+            elif field.read_only:
                 if instance is None or value != current.get(name):
                     errors.append({"path": field_path, "message": "Read-only."})
-                continue
-            codec = context.codecs.lookup(field.form_field)
-            try:
-                decoded = codec.from_wire(value, field)
-            except WireError as exc:
-                errors.append({"path": field_path, "message": str(exc)})
-                continue
-            hidden = [
-                p
-                for p in context.excluded_paths
-                if len(tokens(p)) > 1 and p.startswith(name)
-            ]
-            if hidden and isinstance(decoded, (dict, list)):
-                old = {name: data.get(name)}
-                new = {name: decoded}
-                for hidden_path in hidden:
-                    for concrete, container, key in iter_path(old, hidden_path):
-                        _set_concrete(new, concrete, container[key])
-                decoded = new[name]
-            data[name] = decoded
+            else:
+                try:
+                    data[name] = self.decode(context, field, value, data.get(name))
+                except WireError as exc:
+                    errors.append({"path": field_path, "message": str(exc)})
 
         data.update(extra or {})
         form = context.form_class(data=data, files={}, instance=instance)
@@ -206,6 +206,27 @@ class FormAdapter:
         for form_field in form.fields.values():
             form_field.widget = RawWidget()
         return form, errors
+
+    def decode(self, context, field, value, current):
+        """
+        One wire value as form data; ``current`` is the field's current form
+        data, for the values inside JSON which ``EXCLUDE_FIELDS`` hides
+        """
+        decoded = context.codecs.lookup(field.form_field).from_wire(value, field)
+        if isinstance(decoded, UploadRef):
+            return resolve_upload(context.request, decoded)
+        hidden = [
+            path
+            for path in context.excluded_paths
+            if len(tokens(path)) > 1 and tokens(path)[0] == field.name
+        ]
+        if hidden and isinstance(decoded, (dict, list)):
+            old, new = {field.name: current}, {field.name: decoded}
+            for hidden_path in hidden:
+                for concrete, container, key in iter_path(old, hidden_path):
+                    _set_concrete(new, concrete, container[key])
+            decoded = new[field.name]
+        return decoded
 
     def json_schema(self, context):
         fields, excluded = self.fields(context)

@@ -2,6 +2,11 @@
 
 ## Next version
 
+- Added staged uploads: `POST /uploads/` stores a file for a day
+  (`UPLOAD_LIFETIME`), a write names it as `{"upload": id}` in a file field,
+  which saves a copy with its own `upload_to`, and the upload is removed
+  once the write is committed. `./manage.py f3api_cleanup` removes expired
+  uploads and tokens.
 - Added the write side: `POST` to create objects with their content,
   `PATCH` for fields and regions, `PUT …/content/` for regions, `PATCH` for
   one plugin, `DELETE`. Writes go through the admin's forms, need

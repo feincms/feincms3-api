@@ -333,6 +333,13 @@ class ModelMultipleChoiceCodec(Codec):
         }
 
 
+@dataclasses.dataclass(frozen=True)
+class UploadRef:
+    """``{"upload": id}``, resolved against the user's uploads when binding"""
+
+    id: str
+
+
 class FileCodec(Codec):
     """
     A file of the object itself (not a django-cabinet reference): its name
@@ -350,13 +357,16 @@ class FileCodec(Codec):
 
     def from_wire(self, value, field):
         """
-        ``None`` clears the file; what was read keeps it. New files come
-        through ``/uploads/``, which doesn't exist yet.
+        ``None`` clears the file; what was read keeps it; ``{"upload": id}``
+        is a file from ``/uploads/``
         """
         if value is None:
+            if field.form_field.required:
+                # Django's FileField would keep the file without a word.
+                raise WireError("Required, it can't be cleared.")
             return False  # Like the admin's "clear" checkbox
         if isinstance(value, dict) and "upload" in value:
-            raise WireError("Uploads aren't supported yet.")
+            return UploadRef(str(value["upload"]))
         if isinstance(value, dict) and "name" in value:
             return None  # Unchanged
         raise WireError('Expected null, the file as read, or {"upload": id}.')

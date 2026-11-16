@@ -36,7 +36,7 @@ class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin):
     def register(self, resource):
         if "router" in self.__dict__:
             raise RuntimeError("Register resources before using the router.")
-        if resource.name in self._resources or resource.name == "schema":
+        if resource.name in self._resources or resource.name in {"schema", "uploads"}:
             raise ValueError(f"The resource name {resource.name!r} is taken.")
         self._resources[resource.name] = resource
         return resource

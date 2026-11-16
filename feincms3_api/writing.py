@@ -6,11 +6,14 @@ Every write is one transaction, needs the ETag of what the client read
 dry run, and is logged in the admin's history.
 """
 
+import os
+
 from django.db import transaction
 from django.db.models import ProtectedError
 
 from feincms3_api.adapters import form_errors
 from feincms3_api.codecs import label
+from feincms3_api.conf import config
 from feincms3_api.content import log_message, plan_content, save_plan, validate_plan
 from feincms3_api.errors import (
     ConflictError,
@@ -20,9 +23,25 @@ from feincms3_api.errors import (
     PreconditionRequiredError,
     ValidationFailedError,
 )
+from feincms3_api.models import Upload
 
 
 class WritingMixin:
+    def upload(self, request, file):
+        """Stage a file for a later write, see ``Upload``"""
+        if not (request.user.is_active and request.user.is_staff):
+            raise ForbiddenError("Only staff users can upload files.")
+        name = os.path.basename(file.name)
+        upload = Upload(user=request.user, name=name, size=file.size)
+        upload.file.save(name, file, save=False)
+        upload.save()
+        return {
+            "upload": str(upload.pk),
+            "name": upload.name,
+            "size": upload.size,
+            "expires_at": (upload.created_at + config()["UPLOAD_LIFETIME"]).isoformat(),
+        }
+
     def _check_etag(self, request, resource, obj, if_match):
         if not if_match:
             raise PreconditionRequiredError(

@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -126,3 +127,63 @@ class APIToken(models.Model):
     @property
     def is_expired(self):
         return self.expires_at <= timezone.now()
+
+
+def upload_storage():
+    from django.core.files.storage import storages  # noqa: PLC0415
+
+    return storages[config()["UPLOAD_STORAGE"]]
+
+
+class UploadQuerySet(models.QuerySet):
+    def usable(self, user):
+        """The user's uploads which haven't expired"""
+        return self.filter(
+            user=user, created_at__gt=timezone.now() - config()["UPLOAD_LIFETIME"]
+        )
+
+    def expired(self):
+        return self.filter(created_at__lte=timezone.now() - config()["UPLOAD_LIFETIME"])
+
+
+class Upload(models.Model):
+    """
+    A staged file: uploaded on its own, then named in a write, where the
+    target field saves a copy with its own ``upload_to`` and storage, and
+    the upload is deleted
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="+",
+        verbose_name=_("user"),
+    )
+    file = models.FileField(
+        _("file"), upload_to="feincms3_api/uploads/%Y/%m/", storage=upload_storage
+    )
+    name = models.CharField(_("name"), max_length=1000)
+    size = models.PositiveBigIntegerField(_("size"))
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    objects = UploadQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("upload")
+        verbose_name_plural = _("uploads")
+
+    def __str__(self):
+        return self.name
+
+    def as_file(self):
+        """The file to hand to a form, under its original name"""
+        from django.core.files import File  # noqa: PLC0415
+
+        return File(self.file.open("rb"), name=self.name)
+
+    def discard(self):
+        """Delete the row and the stored file; once is enough"""
+        if type(self).objects.filter(pk=self.pk).delete()[0]:
+            self.file.delete(save=False)

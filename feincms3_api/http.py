@@ -4,7 +4,7 @@ import functools
 from typing import Any
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from ninja import Router, Schema
+from ninja import File, Router, Schema, UploadedFile
 
 from feincms3_api.errors import APIError
 from feincms3_api.reading import _bool
@@ -37,6 +37,13 @@ def build_router(api):
     def type_schema(request, type_label: str):
         """The JSON schema of one type's ``fields``"""
         return api.type_schema(request, type_label)
+
+    @router.post("uploads/", operation_id="upload")
+    @_errors
+    def upload(request, file: File[UploadedFile]):
+        """Stage a file (multipart, field ``file``); name it in a write as
+        ``{"upload": id}``"""
+        return JsonResponse(api.upload(request, file), status=201)
 
     for resource in api.resources:
         _add_routes(api, router, resource.name)

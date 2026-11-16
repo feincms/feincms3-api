@@ -11,6 +11,9 @@ DEFAULTS = {
     "DEFAULT_PAGE_SIZE": 50,
     # About one editing session; a new token for the next one
     "TOKEN_LIFETIME": dt.timedelta(hours=8),
+    # Staged uploads: unused ones are removed by ``f3api_cleanup``
+    "UPLOAD_LIFETIME": dt.timedelta(days=1),
+    "UPLOAD_STORAGE": "default",
 }
 
 

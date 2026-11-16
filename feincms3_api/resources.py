@@ -184,6 +184,7 @@ class Resource:
             form_class=model_admin.get_form(request, obj, change=obj is not None),
             read_only=_read_only(model_admin, request, obj),
             codecs=api.codecs,
+            request=request,
         )
 
     def plugin_inlines(self, request, obj=None):
@@ -201,6 +202,7 @@ class Resource:
             read_only=_read_only(inline, request, obj),
             exclude=STRUCTURAL_FIELDS | {inline.fk_name},
             codecs=api.codecs,
+            request=request,
         )
 
     def regions(self, obj):
