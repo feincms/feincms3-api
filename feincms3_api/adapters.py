@@ -6,7 +6,9 @@ That covers every plugin made of ordinary fields without any code. Projects
 register their own adapter for a type only to change the shape.
 """
 
+import copy
 import dataclasses
+import re
 
 from django import forms
 from django.core.exceptions import FieldDoesNotExist
@@ -14,6 +16,7 @@ from django.db import models
 
 from feincms3_api.codecs import Field, codecs as default_codecs
 from feincms3_api.conf import excluded_paths
+from feincms3_api.errors import WireError
 from feincms3_api.paths import iter_path, tokens
 
 
@@ -31,6 +34,73 @@ class Context:
     @property
     def excluded_paths(self):
         return excluded_paths(self.type)
+
+
+class RawWidget(forms.Widget):
+    """
+    Hands a value to the form field's ``clean()`` as it is
+
+    The admin's widgets read HTML form data (a date and a time as
+    ``name_0`` and ``name_1``, a checkbox as present or not). The API's
+    values are already what the fields clean, so the forms get this widget.
+    """
+
+    def value_from_datadict(self, data, files, name):
+        return data.get(name)
+
+    def value_omitted_from_data(self, data, files, name):
+        return name not in data
+
+
+def current_data(form):
+    """An unbound form's initial values, as data its fields can clean"""
+    data = {}
+    for name, field in form.fields.items():
+        value = form.get_initial_for_field(field, name)
+        if isinstance(field, forms.FileField):
+            value = None  # Keeps the file
+        elif isinstance(field, forms.MultiValueField):
+            value = field.widget.decompress(value)
+        elif isinstance(value, (list, tuple)):
+            value = [getattr(item, "pk", item) for item in value]
+        elif isinstance(value, models.Model):
+            value = value.pk
+        elif isinstance(value, dict):
+            value = copy.deepcopy(value)  # Not the instance's own JSON
+        data[name] = value
+    return data
+
+
+def form_errors(form, path):
+    """A bound form's errors as ``[{"path", "message"}]``"""
+    return [
+        {
+            "path": path if name == forms.forms.NON_FIELD_ERRORS else f"{path}.{name}",
+            "message": str(message),
+        }
+        for name, messages in form.errors.items()
+        for message in messages
+    ]
+
+
+def _set_concrete(data, concrete, value):
+    """Set ``value`` at a concrete path (``data.figures[0].unit``) if its
+    parents exist"""
+    keys = [
+        int(index) if index else name
+        for index, name in re.findall(r"\[(\d+)\]|([^.\[\]]+)", concrete)
+    ]
+    node = data
+    for key in keys[:-1]:
+        try:
+            node = node[key]
+        except (KeyError, IndexError, TypeError):
+            return
+    last = keys[-1]
+    if (isinstance(node, dict) and isinstance(last, str)) or (
+        isinstance(node, list) and isinstance(last, int) and last < len(node)
+    ):
+        node[last] = value
 
 
 class FormAdapter:
@@ -73,8 +143,69 @@ class FormAdapter:
                 value = form.get_initial_for_field(field.form_field, field.name)
             codec = context.codecs.lookup(field.form_field)
             data[field.name] = codec.to_wire(value, field)
+        # The values may be the instance's own JSON data: remove from a copy.
+        data = copy.deepcopy(data)
         _remove_paths(data, context.excluded_paths)
         return data
+
+    def bind(self, context, instance, wire, *, path, extra=None):
+        """
+        ``(bound form, errors)``: the current values, with the wire fields
+        decoded over them, and ``extra`` (form data, e.g. a plugin's region)
+
+        A field which isn't sent keeps its value. Read-only fields may be
+        sent unchanged, so what was read can be written back. Values inside
+        JSON data which ``EXCLUDE_FIELDS`` hides are kept as they were, by
+        their position.
+        """
+        errors = []
+        if not isinstance(wire, dict):
+            return None, [{"path": path, "message": "Expected an object."}]
+        fields, _excluded = self.fields(context)
+        by_name = {field.name: field for field in fields}
+        unbound = context.form_class(instance=instance)
+        data = current_data(unbound)
+        current = self.to_wire(context, instance) if instance is not None else {}
+
+        for name, value in wire.items():
+            field_path = f"{path}.{name}"
+            if (field := by_name.get(name)) is None:
+                errors.append({"path": field_path, "message": "Unknown field."})
+                continue
+            if field.read_only:
+                if instance is None or value != current.get(name):
+                    errors.append({"path": field_path, "message": "Read-only."})
+                continue
+            codec = context.codecs.lookup(field.form_field)
+            try:
+                decoded = codec.from_wire(value, field)
+            except WireError as exc:
+                errors.append({"path": field_path, "message": str(exc)})
+                continue
+            hidden = [
+                p
+                for p in context.excluded_paths
+                if len(tokens(p)) > 1 and p.startswith(name)
+            ]
+            if hidden and isinstance(decoded, (dict, list)):
+                old = {name: data.get(name)}
+                new = {name: decoded}
+                for hidden_path in hidden:
+                    for concrete, container, key in iter_path(old, hidden_path):
+                        _set_concrete(new, concrete, container[key])
+                decoded = new[name]
+            data[name] = decoded
+
+        data.update(extra or {})
+        form = context.form_class(data=data, files={}, instance=instance)
+        # Fields the API sets itself (e.g. a plugin's parent) aren't the
+        # form's business, unless their values are in ``extra``.
+        for name in context.exclude:
+            if name not in (extra or {}):
+                form.fields.pop(name, None)
+        for form_field in form.fields.values():
+            form_field.widget = RawWidget()
+        return form, errors
 
     def json_schema(self, context):
         fields, excluded = self.fields(context)

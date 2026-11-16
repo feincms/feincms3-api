@@ -16,6 +16,7 @@ from django import forms
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
+from feincms3_api.errors import WireError
 from feincms3_api.kinds import (
     CHOICES,
     HTML,
@@ -77,6 +78,13 @@ class Codec:
     def to_wire(self, value, field):
         return value
 
+    def from_wire(self, value, field):
+        """
+        The value the form field's ``clean()`` gets; raise ``WireError`` if
+        the value can't be one
+        """
+        return value
+
     def json_schema(self, field):
         return {}
 
@@ -119,7 +127,11 @@ def string_kind(field):
 class CharCodec(Codec):
     kind = None
 
-    def to_wire(self, value, field):
+    def from_wire(self, value, field):
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise WireError("Expected a string.")
         return value
 
     def json_schema(self, field):
@@ -142,6 +154,13 @@ class HTMLCodec(CharCodec):
 
 
 class BooleanCodec(Codec):
+    def from_wire(self, value, field):
+        if value is None and isinstance(field.form_field, forms.NullBooleanField):
+            return None
+        if not isinstance(value, bool):
+            raise WireError("Expected true or false.")
+        return value
+
     def json_schema(self, field):
         if isinstance(field.form_field, forms.NullBooleanField):
             return {"type": ["boolean", "null"]}
@@ -168,6 +187,11 @@ class DecimalCodec(Codec):
 
     def to_wire(self, value, field):
         return None if value is None else str(value)
+
+    def from_wire(self, value, field):
+        if isinstance(value, float):
+            raise WireError("Expected a string, not a float, to keep the precision.")
+        return value
 
     def json_schema(self, field):
         return _nullable({"type": "string", "format": "decimal"}, field)
@@ -213,9 +237,30 @@ class ChoiceCodec(Codec):
         return schema
 
 
+class SplitDateTimeCodec(TemporalCodec):
+    """The admin's date and time inputs: an ISO date-time on the wire"""
+
+    def __init__(self):
+        super().__init__("date-time")
+
+    def from_wire(self, value, field):
+        if value in {None, ""}:
+            return [None, None]
+        try:
+            parsed = dt.datetime.fromisoformat(value)
+        except (TypeError, ValueError) as exc:
+            raise WireError("Expected an ISO 8601 date and time.") from exc
+        return [parsed.date().isoformat(), parsed.time().isoformat()]
+
+
 class MultipleChoiceCodec(Codec):
     def to_wire(self, value, field):
         return list(value or ())
+
+    def from_wire(self, value, field):
+        if not isinstance(value, list):
+            raise WireError("Expected a list.")
+        return value
 
     def json_schema(self, field):
         values = [_json_value(v) for v in _choice_values(field.form_field.choices)]
@@ -227,6 +272,21 @@ def reference(obj_or_pk, model):
         return None
     pk = getattr(obj_or_pk, "pk", obj_or_pk)
     return {"type": label(model), "id": pk}
+
+
+def reference_pk(value, model):
+    """The primary key of a reference: ``{"type", "id"}`` or the bare id"""
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        if value.get("type") != label(model):
+            raise WireError(f"Expected a reference to {label(model)}.")
+        if "id" not in value:
+            raise WireError("A reference needs an id.")
+        return value["id"]
+    if isinstance(value, (int, str)):
+        return value
+    raise WireError(f"Expected a reference to {label(model)}.")
 
 
 def reference_schema(model):
@@ -245,6 +305,9 @@ class ModelChoiceCodec(Codec):
     def to_wire(self, value, field):
         return reference(value, field.form_field.queryset.model)
 
+    def from_wire(self, value, field):
+        return reference_pk(value, field.form_field.queryset.model)
+
     def json_schema(self, field):
         schema = reference_schema(field.form_field.queryset.model)
         if not field.form_field.required:
@@ -256,6 +319,12 @@ class ModelMultipleChoiceCodec(Codec):
     def to_wire(self, value, field):
         model = field.form_field.queryset.model
         return [reference(item, model) for item in value or ()]
+
+    def from_wire(self, value, field):
+        if not isinstance(value, list):
+            raise WireError("Expected a list of references.")
+        model = field.form_field.queryset.model
+        return [reference_pk(item, model) for item in value]
 
     def json_schema(self, field):
         return {
@@ -278,6 +347,19 @@ class FileCodec(Codec):
         except ValueError:
             url = None
         return {"name": value.name, "url": url}
+
+    def from_wire(self, value, field):
+        """
+        ``None`` clears the file; what was read keeps it. New files come
+        through ``/uploads/``, which doesn't exist yet.
+        """
+        if value is None:
+            return False  # Like the admin's "clear" checkbox
+        if isinstance(value, dict) and "upload" in value:
+            raise WireError("Uploads aren't supported yet.")
+        if isinstance(value, dict) and "name" in value:
+            return None  # Unchanged
+        raise WireError('Expected null, the file as read, or {"upload": id}.')
 
     def json_schema(self, field):
         return {
@@ -337,6 +419,7 @@ codecs.register(forms.FloatField, FloatCodec())
 codecs.register(forms.DecimalField, DecimalCodec())
 codecs.register(forms.DateField, TemporalCodec("date"))
 codecs.register(forms.DateTimeField, TemporalCodec("date-time"))
+codecs.register(forms.SplitDateTimeField, SplitDateTimeCodec())
 codecs.register(forms.TimeField, TemporalCodec("time"))
 codecs.register(forms.DurationField, TemporalCodec("duration"))
 codecs.register(forms.ChoiceField, ChoiceCodec())

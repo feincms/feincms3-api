@@ -597,7 +597,12 @@ plugins and cabinet.
    real site's content.
 2. Writes, the service layer first and endpoints around it: object
    `PATCH`/`POST`, content `PUT`, plugin `PATCH`, dry run, ETags,
-   `LogEntry`, error paths.
+   `LogEntry`, error paths. Done. Fields go into the admin's forms through
+   a widget which hands values to the fields' `clean()` as they are (the
+   admin's widgets expect HTML form data). Read-only fields may be written
+   back unchanged; values hidden by `EXCLUDE_FIELDS` inside JSON data are
+   kept by their position. Change messages are the admin's, followed by
+   "(Through the API.)".
 3. Pages (tree, move, find, translations filter), uploads and file fields,
    cabinet (files, folders, unused files).
 4. feincms3-sites and feincms3-language-sites test apps.

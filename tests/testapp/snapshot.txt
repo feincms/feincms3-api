@@ -59,6 +59,11 @@ testapp.page (resource pages)
   path: machine (read-only)
   region standard.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
   region articles.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
+testapp.person (resource persons)
+  name: text
+  role_de: text
+  role_fr: text
+  role_it: text
 testapp.richtext (plugin of testapp.page)
   text: html
 testapp.tab (plugin of testapp.tablist)

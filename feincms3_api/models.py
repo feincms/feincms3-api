@@ -26,7 +26,10 @@ def _hash(secret, key=None):
     the secret to find the row. The HMAC ties the tokens to ``SECRET_KEY``:
     a leaked database is useless without it, and rotating it without a
     fallback revokes every token at once. Tokens are found by this hash,
-    through a unique index.
+    through a unique index; there's no comparison of secrets in Python,
+    which would need ``constant_time_compare``. A timing difference in the
+    lookup could only tell an attacker about the HMACs of their own input,
+    which they can't steer without the key.
     """
     return salted_hmac(KEY_SALT, secret, secret=key, algorithm="sha256").hexdigest()
 

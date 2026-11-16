@@ -16,12 +16,14 @@
 - `specs/api.md`: the spec. Read it before working on the API, and keep it
   up to date when decisions change.
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
-  `api.py` (`ContentAPI`: registration, the operations as plain methods, the
-  ninja router around them), `resources.py` (what's read from the admin),
-  `models.py`, `auth.py` and `admin.py` (API tokens),
-  `adapters.py` (an object's or plugin's `fields`), `codecs.py` (one form
-  field in wire format and JSON schema), `kinds.py` and `paths.py` (from
-  autotranslate).
+  `api.py` (`ContentAPI`: registration, put together from the operation
+  mixins in `reading.py`, `schema.py` and `writing.py`), `content.py`
+  (planning a content write), `http.py` (the ninja routes around the
+  operations), `resources.py` (what's read from the admin), `adapters.py`
+  (an object's or plugin's `fields`, binding them to admin forms),
+  `codecs.py` (one form field in wire format and JSON schema), `errors.py`,
+  `models.py`, `auth.py` and `admin.py` (API tokens), `kinds.py` and
+  `paths.py` (from autotranslate).
 - `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
   regenerate it with `.venv/bin/python tests/manage.py f3api_schema >
   tests/testapp/snapshot.txt` and look at the diff.

@@ -17,6 +17,7 @@ from django.urls import NoReverseMatch, reverse
 
 from feincms3_api.adapters import Context
 from feincms3_api.codecs import label
+from feincms3_api.errors import ConflictError
 
 
 STRUCTURAL_FIELDS = frozenset({"region", "ordering", "depth"})
@@ -260,34 +261,43 @@ class Resource:
             meta["regions"] = [region_info(region) for region in regions]
         return meta
 
-    def read_content(self, request, obj, api, warnings):
-        """``(content, container types)``, the content flat with depths"""
-        inlines = self.plugin_inlines(request, obj)
-        if not inlines:
-            return None, set()
+    def plugins(self, inlines, obj):
+        """
+        ``(visible, hidden)``: the object's plugins in order, those with an
+        inline (as ``(plugin, inline)``) and those without
+        """
         by_model = {inline.model: inline for inline in inlines}
         lookups = {}
         for inline in inlines:
             lookups.setdefault(inline.model._meta.concrete_model, inline.fk_name)
 
         plugins = []
-        for concrete, fk_name in lookups.items():
-            if hasattr(concrete, "get_queryset"):
-                queryset = concrete.get_queryset()
-            else:  # pragma: no cover
-                queryset = concrete._default_manager.all()
-            plugins.extend(queryset.filter(Q(**{fk_name: obj})))
+        if obj.pk is not None:
+            for concrete, fk_name in lookups.items():
+                if hasattr(concrete, "get_queryset"):
+                    queryset = concrete.get_queryset()
+                else:  # pragma: no cover
+                    queryset = concrete._default_manager.all()
+                plugins.extend(queryset.filter(Q(**{fk_name: obj})))
 
-        hidden = [plugin for plugin in plugins if type(plugin) not in by_model]
+        plugins.sort(key=lambda plugin: (plugin.region, plugin.ordering, plugin.pk))
+        visible = [(p, by_model[type(p)]) for p in plugins if type(p) in by_model]
+        hidden = [p for p in plugins if type(p) not in by_model]
+        return visible, hidden
+
+    def read_content(self, request, obj, api, warnings):
+        """``(content, container types)``, the content flat with depths"""
+        inlines = self.plugin_inlines(request, obj)
+        if not inlines:
+            return None, set()
+        by_model = {inline.model: inline for inline in inlines}
+        visible, hidden = self.plugins(inlines, obj)
         if hidden:
             warnings.append(
                 f"{len(hidden)} plugin(s) aren't shown: no inline for their type,"
                 " or no permission to see it."
             )
-        plugins = sorted(
-            (plugin for plugin in plugins if type(plugin) in by_model),
-            key=lambda plugin: (plugin.region, plugin.ordering, plugin.pk),
-        )
+        plugins = [plugin for plugin, _inline in visible]
 
         contexts = {}
         by_region = {}
@@ -343,7 +353,8 @@ class Resource:
             }
         return wire
 
-    def read_plugin(self, request, obj, api, type_label, plugin_id):
+    def get_plugin(self, request, obj, type_label, plugin_id):
+        """``(plugin, inline)`` of one plugin of ``obj``, or ``None``"""
         for inline in self.plugin_inlines(request, obj):
             if label(inline.model) != type_label:
                 continue
@@ -357,15 +368,24 @@ class Resource:
                 )
             except (ValidationError, model.DoesNotExist):
                 return None
-            context = self.plugin_context(request, inline, obj, api)
-            return {
-                "type": type_label,
-                "id": plugin.pk,
-                "region": plugin.region,
-                "depth": getattr(plugin, "depth", 0),
-                "fields": api.adapters.lookup(type_label).to_wire(context, plugin),
-            }
+            return plugin, inline
         return None
+
+    def read_plugin(self, request, obj, api, type_label, plugin_id):
+        if (found := self.get_plugin(request, obj, type_label, plugin_id)) is None:
+            return None
+        plugin, inline = found
+        context = self.plugin_context(request, inline, obj, api)
+        return {
+            "type": type_label,
+            "id": plugin.pk,
+            "region": plugin.region,
+            "depth": getattr(plugin, "depth", 0),
+            "fields": api.adapters.lookup(type_label).to_wire(context, plugin),
+        }
+
+    def check_delete(self, request, obj):
+        """Raise ``ConflictError`` if ``obj`` mustn't be deleted"""
 
 
 class ObjectResource(Resource):
@@ -379,3 +399,14 @@ class PageResource(Resource):
 
     def meta(self, request, obj, wire):
         return {"path": obj.path, **super().meta(request, obj, wire)}
+
+    def check_delete(self, request, obj):
+        children = self.model._default_manager.filter(parent=obj)
+        if children.exists():
+            raise ConflictError(
+                "The page has subpages; delete or move them first.",
+                children=[
+                    {"type": self.type, "id": child.pk, "title": str(child)}
+                    for child in children
+                ],
+            )
