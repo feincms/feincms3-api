@@ -425,34 +425,6 @@ class PageResource(Resource):
                 return tuple(field for field in fields if field != "path")
         return ()
 
-    def validate_instance(self, obj):
-        """
-        A new page's path clashing with another page's in its scope
-
-        feincms3 computes the path while validating, but only checks clashes
-        for existing pages, and Django's own unique check skips a
-        ``unique_together`` with a field the form doesn't have (``site``,
-        which comes from the parent, or a read-only ``path``).
-        """
-        filters = {"path": obj.path}
-        for field in self.path_scope():
-            if field == "site":
-                filters["site_id"] = obj.site_id or (
-                    obj.parent.site_id if obj.parent_id else None
-                )
-            else:
-                filters[field] = getattr(obj, field)
-        clash = self.model._default_manager.filter(**filters).exclude(pk=obj.pk)
-        if (other := clash.first()) is not None:
-            field = "path" if obj.static_path else "slug"
-            return [
-                {
-                    "path": f"fields.{field}",
-                    "message": f"The path {obj.path} is already used by {other}.",
-                }
-            ]
-        return []
-
     def scope_for_host(self, host):
         """The filter for the pages served on ``host``, ``None`` if none are"""
         scope = self.path_scope()

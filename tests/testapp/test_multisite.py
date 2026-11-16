@@ -68,8 +68,7 @@ class SitesTest(MultisiteTestCase):
         page = SitePage.objects.get(pk=response.json()["id"])
         self.assertEqual((page.site, page.path), (self.org, "/home/kontakt/"))
 
-        # A second one on the same site clashes; not caught by the admin's
-        # form nor by feincms3 for new pages
+        # A second one on the same site clashes
         response = self.post(
             "site-pages/",
             {
@@ -82,7 +81,7 @@ class SitesTest(MultisiteTestCase):
             },
         )
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["errors"][0]["path"], "fields.slug")
+        self.assertEqual(response.json()["errors"][0]["path"], "fields.path")
 
     def test_root_needs_a_site(self):
         response = self.post(

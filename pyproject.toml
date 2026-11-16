@@ -31,7 +31,7 @@ dependencies = [
   "django>=5.2",
   "django-content-editor>=10",
   "django-ninja>=1.4",
-  "feincms3>=5",
+  "feincms3>=7.1",
   "feincms3-data>=0.11",
 ]
 optional-dependencies.anthropic = [
@@ -45,7 +45,7 @@ optional-dependencies.tests = [
   "django-translated-fields",
   "feincms3-forms",
   "feincms3-language-sites",
-  "feincms3-sites",
+  "feincms3-sites>=0.23",
 ]
 urls.Homepage = "https://github.com/feincms/feincms3-api/"
 

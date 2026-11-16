@@ -4,10 +4,10 @@
 
 - Added feincms3-sites and feincms3-language-sites support: `find/` takes
   `host=` and looks up the page in the host's site or language; the scope
-  comes from the page model's `unique_together`. New pages whose path is
-  taken in their scope are refused (feincms3 and Django's unique check
-  don't catch that for new pages, the admin answers with a 500), and an
-  `IntegrityError` during a write is a `409`, not a 500.
+  comes from the page model's `unique_together`. An `IntegrityError`
+  during a write is a `409`, not a 500.
+- Raised the minimum feincms3 version to 7.1, which refuses new pages whose
+  path is taken.
 - Added django-cabinet support: `FileResource` and `FolderResource` in
   `feincms3_api.cabinet`. Strings named `ppoi` or `*_ppoi` (django-imagefield)
   are machine strings.

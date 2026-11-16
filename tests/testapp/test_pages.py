@@ -82,4 +82,6 @@ class PagesTest(WriteTestCase):
             },
         )
         self.assertEqual(response.status_code, 422, response.content)
-        self.assertEqual(response.json()["errors"][0]["path"], "fields.slug")
+        # Reported by feincms3; the form has no path field
+        self.assertEqual(response.json()["errors"][0]["path"], "fields")
+        self.assertIn("/de/angebot/", response.json()["errors"][0]["message"])
