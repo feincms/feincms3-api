@@ -7,11 +7,16 @@ from pathlib import Path
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
+from feincms3_data.data import dump_specs
+
 from feincms3_api.incubator.autotranslate import datasets as ds
 from feincms3_api.incubator.autotranslate.apps import check_field_settings
 from feincms3_api.incubator.autotranslate.backends import TranslationError
 from feincms3_api.incubator.autotranslate.fields import field_specs
-from feincms3_api.incubator.autotranslate.loader import run_from_dumps, run_from_translated
+from feincms3_api.incubator.autotranslate.loader import (
+    run_from_dumps,
+    run_from_translated,
+)
 from feincms3_api.incubator.autotranslate.strings import (
     DumpError,
     check_answer,
@@ -19,8 +24,6 @@ from feincms3_api.incubator.autotranslate.strings import (
     split_strings,
 )
 from feincms3_api.incubator.autotranslate.translate import Job
-from feincms3_data.data import dump_specs
-
 from testapp import models as m
 
 

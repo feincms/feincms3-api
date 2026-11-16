@@ -215,7 +215,7 @@ def specs_for_raw(raw):
     model = apps.get_model(raw["model"])
     if proxies := json_proxies(model):
         type = raw["fields"].get("type")
-        model = next((p for p in proxies if p.TYPE == type), model)
+        model = next((p for p in proxies if type == p.TYPE), model)
     return field_specs(model)
 
 

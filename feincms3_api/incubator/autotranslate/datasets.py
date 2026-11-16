@@ -247,8 +247,7 @@ def _language_region_pks(model, pks, lr_model):
         for field in plugin._meta.concrete_fields:
             if field.many_to_one and field.related_model is lr_model:
                 result.update(
-                    plugin._default_manager
-                    .filter(parent__in=pks)
+                    plugin._default_manager.filter(parent__in=pks)
                     .exclude(**{field.attname: None})
                     .values_list(field.attname, flat=True)
                 )

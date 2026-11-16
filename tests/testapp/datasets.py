@@ -3,7 +3,6 @@ from feincms3_api.incubator.autotranslate.datasets import (
     object_dataset,
     page_tree_dataset,
 )
-
 from testapp.models import Article, Form, Page, Session, Speaker, TabList, Training
 
 

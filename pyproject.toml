@@ -102,6 +102,14 @@ lint.per-file-ignores."*/migrat*/*" = [
   # Ignore the fact that migration files are invalid module names
   "N999",
 ]
+lint.per-file-ignores."feincms3_api/incubator/*" = [
+  # The incubator isn't held to the package's complexity limits
+  "N818",
+  "PLR09",
+]
+lint.per-file-ignores."tests/testapp/test_autotranslate.py" = [
+  "PLR09",
+]
 lint.isort.combine-as-imports = true
 lint.isort.lines-after-imports = 2
 lint.mccabe.max-complexity = 15

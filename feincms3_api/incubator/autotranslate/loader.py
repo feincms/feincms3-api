@@ -97,7 +97,7 @@ def _proxy_class(obj):
     if not has_field(model, "type"):
         return model
     for proxy in json_proxies(model):
-        if proxy.TYPE == obj.type:
+        if obj.type == proxy.TYPE:
             return proxy
     stack = list(model.__subclasses__())
     while stack:
@@ -444,8 +444,7 @@ class Run:
         ):
             return None
         return (
-            page
-            ._clash_candidates()
+            page._clash_candidates()
             .filter(
                 app_namespace=type.app_namespace(page),
                 language_code=self.target,
@@ -653,10 +652,12 @@ class Run:
         if label(
             model
         ) in self.registry.language_regions and not self._has_target_region(target):
-            self.problems["regions"].append((
-                *where,
-                f"{_describe(target)}, which has nothing in its {self.target} region",
-            ))
+            self.problems["regions"].append(
+                (
+                    *where,
+                    f"{_describe(target)}, which has nothing in its {self.target} region",
+                )
+            )
         for name, columns in translated_fields(model).items():
             source_col = columns.get(self.source)
             target_col = columns.get(self.target)
@@ -666,10 +667,12 @@ class Run:
                 and getattr(target, source_col)
                 and not getattr(target, target_col)
             ):
-                self.problems["translated_fields"].append((
-                    *where,
-                    f"{_describe(target)}: {name} has no {self.target} text",
-                ))
+                self.problems["translated_fields"].append(
+                    (
+                        *where,
+                        f"{_describe(target)}: {name} has no {self.target} text",
+                    )
+                )
 
     def _save(self, entry):
         owner_ds, *children = entry.deserialized
@@ -799,9 +802,9 @@ class Run:
             for obj, field, value in entry.deferred:
                 new, state = self.counterpart(field.related_model, value)
                 if state in {"copy", "translation"}:
-                    type(obj)._base_manager.filter(pk=obj.pk).update(**{
-                        field.attname: new
-                    })
+                    type(obj)._base_manager.filter(pk=obj.pk).update(
+                        **{field.attname: new}
+                    )
                 else:
                     self._reference_left(
                         entry, obj, field.name, field.related_model, value
@@ -931,9 +934,9 @@ class Run:
                 if changed:
                     for name in changed:
                         setattr(obj, name, fields[name])
-                    type(obj)._base_manager.filter(pk=obj.pk).update(**{
-                        name: fields[name] for name in changed
-                    })
+                    type(obj)._base_manager.filter(pk=obj.pk).update(
+                        **{name: fields[name] for name in changed}
+                    )
 
     def _map_html(self, entry, obj, field_name, text):
         return map_html(text, lambda url: self._map_url(entry, obj, field_name, url))
