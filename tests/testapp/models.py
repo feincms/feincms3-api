@@ -12,7 +12,7 @@ from feincms3.mixins import (
     RedirectMixin,
 )
 from feincms3.pages import AbstractPage
-from feincms3_forms import models as forms_models
+from feincms3_forms import models as forms_models, validation
 from translated_fields import TranslatedField
 from tree_queries.models import TreeNode
 
@@ -92,7 +92,10 @@ class Tab(create_plugin_base(TabList)):
 class Form(forms_models.ConfiguredForm):
     FORMS = [
         forms_models.FormType(
-            key="contact", label="contact", regions=[Region(key="form", title="form")]
+            key="contact",
+            label="contact",
+            regions=[Region(key="form", title="form")],
+            validate="testapp.models.validate_contact_form",
         )
     ]
     language_code = models.CharField(max_length=10, choices=settings.LANGUAGES)
@@ -109,6 +112,8 @@ class SimpleField(forms_models.SimpleFieldBase, create_plugin_base(Form)):
 
 Text = SimpleField.proxy(SimpleField.Type.TEXT)
 Select = SimpleField.proxy(SimpleField.Type.SELECT)
+# No inline in the admin
+Email = SimpleField.proxy(SimpleField.Type.EMAIL)
 
 
 class FormRichText(create_plugin_base(Form)):
@@ -295,3 +300,11 @@ class Chapter(TreeNode):
 
 class ChapterText(create_plugin_base(Chapter)):
     text = ProseEditorField()
+
+
+def validate_contact_form(form):
+    fields = form.get_formfields_union(plugins=[SimpleField, Rating])
+    return [
+        *validation.validate_uniqueness(fields),
+        *validation.validate_required_fields(fields, {"email"}),
+    ]

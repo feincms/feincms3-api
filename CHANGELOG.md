@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Added `Resource.check()` for problems which don't stop saving, returned
+  in `meta.warnings`, now `{"level", "message", "path"}` objects, and
+  `feincms3_api.forms.ConfiguredFormResource`, which reports the
+  feincms3-forms form type's validation there.
 - Added `TreeResource` for django-tree-queries trees which aren't pages
   (chapters, categories); `PageResource` builds on it.
 - Plugins are read through the inlines' querysets, so feincms3-forms' field

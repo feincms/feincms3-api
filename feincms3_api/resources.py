@@ -49,6 +49,21 @@ def allowed_types(inlines, region_keys):
     return result
 
 
+WARNING, ERROR = "warning", "error"
+
+
+def warning(message, *, level=WARNING, path=None):
+    """
+    One entry of ``meta.warnings``: ``level`` is ``"warning"`` or ``"error"``
+    (it won't work until fixed), ``path`` where the problem is, if somewhere
+    in particular (``fields.name``, ``content.main[2]``)
+    """
+    entry = {"level": level, "message": str(message)}
+    if path is not None:
+        entry["path"] = path
+    return entry
+
+
 def _plugin_order(plugin):
     return (plugin.region, plugin.ordering, plugin.pk)
 
@@ -308,8 +323,11 @@ class Resource:
         visible, hidden = self.plugins(request, inlines, obj)
         if hidden:
             warnings.append(
-                f"{len(hidden)} plugin(s) aren't shown: no inline for their type,"
-                " or no permission to see it."
+                warning(
+                    f"{len(hidden)} plugin(s) aren't shown: no inline for their"
+                    " type, or no permission to see it.",
+                    path="content",
+                )
             )
         plugins = [plugin for plugin, _inline in visible]
 
@@ -336,8 +354,11 @@ class Resource:
         for key, items in by_region.items():
             if key not in content:
                 warnings.append(
-                    f"Region {key!r} isn't one of this object's regions;"
-                    " its plugins are shown, but not rendered."
+                    warning(
+                        f"Region {key!r} isn't one of this object's regions;"
+                        " its plugins are shown, but not rendered.",
+                        path=f"content.{key}",
+                    )
                 )
             content[key] = items
         containers = {
@@ -358,6 +379,7 @@ class Resource:
             data, containers = self.read_content(request, obj, api, warnings)
             if data is not None:
                 wire["content"] = data
+        warnings.extend(self.check(request, obj))
         # The ETag is computed from the flat form, whatever is returned.
         wire["meta"] = self.meta(request, obj, wire) | {"warnings": warnings}
         if nested and "content" in wire:
@@ -403,6 +425,16 @@ class Resource:
         """
         Errors (``[{"path", "message"}]``) the admin's form doesn't find,
         for ``obj`` as it will be saved
+        """
+        return []
+
+    def check(self, request, obj):
+        r"""
+        Problems which don't stop saving, as ``warning()``\s: the object
+        is saved, but may not work as intended
+
+        Returned in ``meta.warnings`` of every read, and so of every write's
+        response (dry runs included), after the content's own warnings.
         """
         return []
 

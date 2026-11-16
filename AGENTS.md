@@ -22,7 +22,8 @@
   operations), `resources.py` (what's read from the admin), `adapters.py`
   (an object's or plugin's `fields`, binding them to admin forms),
   `codecs.py` (one form field in wire format and JSON schema), `errors.py`,
-  `models.py`, `auth.py` and `admin.py` (API tokens), `kinds.py` and
+  `models.py`, `auth.py` and `admin.py` (API tokens), `cabinet.py` and
+  `forms.py` (resources for django-cabinet and feincms3-forms), `kinds.py` and
   `paths.py` (from autotranslate).
 - `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
   regenerate it with `.venv/bin/python tests/manage.py f3api_schema >

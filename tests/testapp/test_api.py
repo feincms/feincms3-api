@@ -291,7 +291,9 @@ class ReadTest(APITestCase):
         RichText.objects.create(parent=self.angebot, region="sidebar", text="<p>x</p>")
         data = self.get(f"pages/{self.angebot.pk}/").json()
         self.assertEqual(len(data["content"]["sidebar"]), 1)
-        self.assertIn("'sidebar'", data["meta"]["warnings"][0])
+        warning = data["meta"]["warnings"][0]
+        self.assertIn("'sidebar'", warning["message"])
+        self.assertEqual(warning["path"], "content.sidebar")
 
     def test_article(self):
         article = Article.objects.create(title="News", slug="news", language_code="de")

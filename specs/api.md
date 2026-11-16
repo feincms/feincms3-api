@@ -132,7 +132,8 @@ permissions and plugins come from. A model with plugins but no
 
 | Resource | for | adds |
 |---|---|---|
-| `ObjectResource` | any model, with or without plugins | nothing; articles, blog entries, events, tab lists, feincms3-forms forms |
+| `ObjectResource` | any model, with or without plugins | nothing; articles, blog entries, events, tab lists |
+| `ConfiguredFormResource` | feincms3-forms `ConfiguredForm` subclasses | the form type's validation in `meta.warnings` |
 | `TreeResource` | django-tree-queries `TreeNode` subclasses | `parent` filter, moved by changing `parent`, deleting a node with children is refused; chapters of a textbook, categories |
 | `PageResource` | feincms3 `AbstractPage` subclasses | a `TreeResource` with `path`, `find/` and sites |
 | `FileResource`, `FolderResource` | django-cabinet's file model and folders | folder filter; folders get an admin of their own (cabinet has none), with cabinet's form and the folder permissions |
@@ -211,6 +212,14 @@ One object, as `GET /content/pages/17/` returns it:
 - **Plugins in regions the object doesn't have** (after a page type change)
   are returned under their region key and listed in `meta.warnings`; the
   admin keeps them too.
+- **`meta.warnings`** are problems which don't stop saving, each
+  `{"level", "message", "path"}`: `level` is `warning` or `error` (saved,
+  but it won't work until fixed), `path` is left out when the problem isn't
+  in one place. Besides the content's own (hidden plugins, unknown regions),
+  a resource adds its own in `Resource.check(request, obj)`;
+  `ConfiguredFormResource` adds the feincms3-forms form type's validation,
+  which the admin shows as messages. Every read has them, so a write's
+  response (dry runs included) tells what the change left to fix.
 - **References** are `{"type", "id"}` objects on read; on write a bare id is
   accepted where the field has one target model. `?expand=references` adds
   `title` and `url` (pages) or `url`, `name`, `width`, `height`, `alt_text`

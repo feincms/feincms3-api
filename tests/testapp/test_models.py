@@ -3,10 +3,12 @@
 from testapp.models import (
     Chapter,
     ChapterText,
+    Email,
     Form,
     FormRichText,
     Rating,
     SimpleField,
+    Text,
     Textbook,
 )
 from testapp.test_write import WriteTestCase
@@ -75,7 +77,10 @@ class FormsTest(WriteTestCase):
         )
         self.assertEqual(Rating.objects.get(parent=form).max_stars, 3)
         self.assertEqual(FormRichText.objects.filter(parent=form).count(), 1)
-        self.assertEqual(data["meta"]["warnings"], [])
+        # The form type's validation, as the admin shows it
+        [error] = data["meta"]["warnings"]
+        self.assertEqual(error["level"], "error")
+        self.assertIn("'email'", error["message"])
 
         # One proxy's plugin is found under its own type only
         select = SimpleField.objects.get(parent=form, type="select")
@@ -95,6 +100,26 @@ class FormsTest(WriteTestCase):
         self.assertEqual(response.status_code, 200, response.content)
         select.refresh_from_db()
         self.assertEqual((select.label, select.type), ("Worum geht es?", "select"))
+
+    def test_validation(self):
+        data = self.create_form()
+        form = Form.objects.get(pk=data["id"])
+        Email.objects.create(parent=form, region="form", ordering=50, name="email")
+        Text.objects.create(
+            parent=form, region="form", ordering=60, name="stars", label="Sterne"
+        )
+        warnings = self.get(f"forms/{form.pk}/").json()["meta"]["warnings"]
+        # The email field has no inline, the name "stars" is used twice
+        self.assertEqual(
+            [(w["level"], w.get("path")) for w in warnings],
+            [("warning", "content"), ("warning", None)],
+        )
+        self.assertIn("'stars' (2)", warnings[1]["message"])
+
+        Form.objects.filter(pk=form.pk).update(form_type="gone")
+        warnings = self.get(f"forms/{form.pk}/").json()["meta"]["warnings"]
+        self.assertEqual(warnings[-1]["level"], "error")
+        self.assertEqual(warnings[-1]["path"], "fields.form_type")
 
     def test_schema(self):
         data = self.get("schema/").json()
