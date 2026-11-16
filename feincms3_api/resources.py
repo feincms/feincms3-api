@@ -319,13 +319,19 @@ class Resource:
         except NoReverseMatch:
             return None
 
-    def meta(self, request, obj, wire):
-        meta = {
+    def describe(self, request, obj):
+        """
+        What a reader needs to show a reference to ``obj`` without reading
+        it: in its ``meta``, and in ``meta.references`` of what refers to it
+        """
+        return {
             "title": self.title(obj),
             "url": self.url(request, obj),
             "admin_url": self.admin_url(obj),
-            "etag": etag(wire),
         }
+
+    def meta(self, request, obj, wire):
+        meta = self.describe(request, obj) | {"etag": etag(wire)}
         if regions := self.regions(obj):
             meta["regions"] = [region_info(region) for region in regions]
         return meta
@@ -570,5 +576,5 @@ class PageResource(TreeResource):
             )
         return pages[0] if pages else None
 
-    def meta(self, request, obj, wire):
-        return {"path": obj.path, **super().meta(request, obj, wire)}
+    def describe(self, request, obj):
+        return {"path": obj.path, **super().describe(request, obj)}

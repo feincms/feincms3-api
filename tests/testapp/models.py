@@ -1,3 +1,4 @@
+from cabinet.fields import CabinetForeignKey
 from content_editor.models import Region, create_plugin_base
 from django import forms as django_forms
 from django.conf import settings
@@ -139,6 +140,9 @@ class Rating(forms_models.FormField, create_plugin_base(Form)):
 class Person(models.Model):
     name = models.CharField(max_length=100)
     role = TranslatedField(models.CharField(max_length=100, blank=True))
+    portrait = CabinetForeignKey(
+        on_delete=models.PROTECT, blank=True, null=True, related_name="+"
+    )
 
     def __str__(self):
         return self.name

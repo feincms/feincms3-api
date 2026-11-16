@@ -88,6 +88,10 @@ class Codec:
     def json_schema(self, field):
         return {}
 
+    def references(self, value, field):
+        """``(type, id)`` of the objects a wire value refers to"""
+        return []
+
 
 def _nullable(schema, field):
     if field.form_field.required:
@@ -305,6 +309,9 @@ class ModelChoiceCodec(Codec):
     def to_wire(self, value, field):
         return reference(value, field.form_field.queryset.model)
 
+    def references(self, value, field):
+        return [(value["type"], value["id"])] if isinstance(value, dict) else []
+
     def from_wire(self, value, field):
         return reference_pk(value, field.form_field.queryset.model)
 
@@ -319,6 +326,11 @@ class ModelMultipleChoiceCodec(Codec):
     def to_wire(self, value, field):
         model = field.form_field.queryset.model
         return [reference(item, model) for item in value or ()]
+
+    def references(self, value, field):
+        return [
+            (item["type"], item["id"]) for item in value or () if isinstance(item, dict)
+        ]
 
     def from_wire(self, value, field):
         if not isinstance(value, list):
@@ -396,10 +408,38 @@ def annotate_json_schema(schema, prefix):
 
 
 class JSONEditorCodec(Codec):
-    """django-json-schema-editor data: the editor's own schema"""
+    """
+    django-json-schema-editor data: the editor's own schema
+
+    References inside the data (``format: foreign_key``) stay bare ids, as
+    stored; the editor's ``foreign_key_descriptions`` say what they refer
+    to, and where if they're given as paths (``foreign_key_paths``).
+    """
 
     def json_schema(self, field):
-        return annotate_json_schema(field.form_field._schema or {}, field.name)
+        schema = annotate_json_schema(field.form_field._schema or {}, field.name)
+        by_path = dict(schema_paths(schema, field.name))
+        for type_label, getter in _foreign_key_descriptions(field):
+            for jmespath in getattr(getter, "keywords", {}).get("paths", ()):
+                # The simple ones are paths in our notation too
+                path = f"{field.name}.{jmespath.replace('[*]', '[]')}"
+                if (sub := by_path.get(path)) is not None:
+                    sub[REF] = type_label
+        return schema
+
+    def references(self, value, field):
+        refs = []
+        for type_label, getter in _foreign_key_descriptions(field):
+            try:
+                pks = getter(value or {})
+            except (TypeError, ValueError):
+                continue
+            refs.extend((type_label, pk) for pk in pks)
+        return refs
+
+
+def _foreign_key_descriptions(field):
+    return getattr(field.form_field, "_foreign_key_descriptions", None) or ()
 
 
 class CodecRegistry:

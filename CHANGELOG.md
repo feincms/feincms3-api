@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Added `?expand=references`: `meta.references` describes everything an
+  object refers to (`Resource.describe()`), django-json-schema-editor's
+  references inside JSON data included, which the schema now marks.
 - Writes go through the admin's formsets and save hooks: every inline is
   bound to the formset the admin would build, and saving runs
   `save_form()`, `save_model()`, `save_related()` (so `save_formset()`) and

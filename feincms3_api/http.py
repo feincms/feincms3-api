@@ -7,7 +7,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from ninja import File, Router, Schema, UploadedFile
 
 from feincms3_api.errors import APIError
-from feincms3_api.reading import _bool
+from feincms3_api.reading import _bool, expands_references
 
 
 class ObjectIn(Schema):
@@ -73,7 +73,13 @@ def _add_routes(api, router, resource):
     @_errors
     def detail(request, pk: str, response: HttpResponse):
         """One object with its content; ``nested=true`` for a tree"""
-        wire = api.detail(request, name, pk, nested=_bool(request.GET.get("nested")))
+        wire = api.detail(
+            request,
+            name,
+            pk,
+            nested=_bool(request.GET.get("nested")),
+            expand=expands_references(request.GET),
+        )
         response["ETag"] = wire["meta"]["etag"]
         return wire
 
@@ -84,7 +90,14 @@ def _add_routes(api, router, resource):
     @_errors
     def plugin(request, pk: str, type_label: str, plugin_id: str):
         """One plugin of an object"""
-        return api.plugin(request, name, pk, type_label, plugin_id)
+        return api.plugin(
+            request,
+            name,
+            pk,
+            type_label,
+            plugin_id,
+            expand=expands_references(request.GET),
+        )
 
     @router.post(f"{name}/", operation_id=f"{operation}_create")
     @_errors

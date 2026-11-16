@@ -231,9 +231,31 @@ One object, as `GET /content/pages/17/` returns it:
   which the admin shows as messages. Every read has them, so a write's
   response (dry runs included) tells what the change left to fix.
 - **References** are `{"type", "id"}` objects on read; on write a bare id is
-  accepted where the field has one target model. `?expand=references` adds
-  `title` and `url` (pages) or `url`, `name`, `width`, `height`, `alt_text`
-  (cabinet files), so a reader doesn't need one request per reference.
+  accepted where the field has one target model. References inside
+  django-json-schema-editor data (`format: foreign_key`) stay bare ids, as
+  stored; the schema marks them (`x-feincms3-ref`) where the plugin's
+  `foreign_key_paths` say where they are.
+- **`?expand=references`** (detail, list, `find/`, plugin) adds
+  `meta.references`, `{type: {id: description}}` of every reference in the
+  object's fields, plugins and inlines, JSON data included, so a reader
+  doesn't need one request per reference:
+
+  ```json
+  "references": {
+    "pages.page": {"17": {"title": "Angebot", "path": "/de/angebot/",
+                          "url": "…", "admin_url": "…"}},
+    "cabinet.file": {"4": {"title": "…", "name": "anna.png", "size": 2048,
+                           "width": 40, "height": 20, "alt_text": "…",
+                           "url": "…", "admin_url": "…"}}
+  }
+  ```
+
+  The references themselves aren't touched, so what was read can still be
+  written back, and the ETag stays the same. Resources describe their
+  objects (`Resource.describe()`, also the start of their `meta`), other
+  models in the admin get their title and admin URL. What the user may not
+  see, or what doesn't exist, is `null`. A list looks its references up
+  together, not per item.
 - **Paths** inside an object use autotranslate's notation:
   `content.main[2].fields.data.figures[0].title`. Error paths, the schema
   snapshot and exclusions in the settings all use it.
@@ -345,7 +367,7 @@ not the verbose name, which changes with the language):
 |---|---|
 | `GET /schema/` | resources, their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
-| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out |
+| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
 | `POST /{resource}/` | create, with or without `content` |
 | `GET /{resource}/{id}/` | one object with its content |
 | `PATCH /{resource}/{id}/` | change fields; `content` if given, see below |

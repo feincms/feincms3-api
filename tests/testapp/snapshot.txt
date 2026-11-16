@@ -71,7 +71,7 @@ testapp.jsonplugin_key_figures (plugin of testapp.page)
 testapp.jsonplugin_page_teaser (plugin of testapp.page)
   data: json
   data.title: text
-  data.page: machine
+  data.page: ref testapp.page
 testapp.page (resource pages)
   parent: ref testapp.page
   position: integer
@@ -94,6 +94,7 @@ testapp.person (resource persons)
   role_de: text
   role_fr: text
   role_it: text
+  portrait: ref cabinet.file
 testapp.rating (plugin of testapp.form)
   name: machine
   label: text

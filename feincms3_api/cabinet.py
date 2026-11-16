@@ -24,6 +24,26 @@ class FileResource(ObjectResource):
         kwargs.setdefault("name", "files")
         super().__init__(get_file_model(), **kwargs)
 
+    def url(self, request, obj):
+        try:
+            url = obj.file.url
+        except ValueError:
+            return None
+        return request.build_absolute_uri(url)
+
+    def describe(self, request, obj):
+        description = super().describe(request, obj) | {
+            "name": obj.file_name,
+            "size": obj.file_size,
+        }
+        if getattr(obj, "image_file", None):
+            description |= {
+                "width": obj.image_width,
+                "height": obj.image_height,
+                "alt_text": obj.image_alt_text,
+            }
+        return description
+
 
 class FolderAdmin(admin.ModelAdmin):
     form = FolderForm

@@ -22,7 +22,8 @@
   rows bound to the admin's formsets), `http.py` (the ninja routes around the
   operations), `resources.py` (what's read from the admin), `adapters.py`
   (an object's or plugin's `fields`, binding them to admin forms),
-  `codecs.py` (one form field in wire format and JSON schema), `errors.py`,
+  `codecs.py` (one form field in wire format and JSON schema),
+  `references.py` (`?expand=references`), `errors.py`,
   `models.py`, `auth.py` and `admin.py` (API tokens), `cabinet.py` and
   `forms.py` (resources for django-cabinet and feincms3-forms), `kinds.py` and
   `paths.py` (from autotranslate).
