@@ -160,3 +160,23 @@ class TokenAdminTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(APIToken.objects.get().user, self.other)
+
+
+class TokenKeyTest(TestCase):
+    def test_secret_key_rotation(self):
+        staff = User.objects.create_user("staff", "", "staff", is_staff=True)
+        with self.settings(SECRET_KEY="old-key"):
+            token, secret = APIToken.objects.create_token(user=staff, name="x")
+        old_hash = token.hash
+
+        # Rotated with a fallback: still valid, and moved to the new key
+        with self.settings(SECRET_KEY="new-key", SECRET_KEY_FALLBACKS=["old-key"]):
+            self.assertEqual(APIToken.objects.for_secret(secret), token)
+        token.refresh_from_db()
+        self.assertNotEqual(token.hash, old_hash)
+        with self.settings(SECRET_KEY="new-key"):
+            self.assertEqual(APIToken.objects.for_secret(secret), token)
+
+        # Rotated without a fallback: revoked
+        with self.settings(SECRET_KEY="newer-key"):
+            self.assertIsNone(APIToken.objects.for_secret(secret))

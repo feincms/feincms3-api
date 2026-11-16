@@ -502,11 +502,13 @@ format. Not v1.
   its own, not in a message (message storage can be a cookie). Or
   `./manage.py f3api_token USERNAME [--write] [--days N]`, which prints it.
 - **Storing them:** a secret is `f3api_` plus 32 random bytes; only its
-  SHA-256 is stored, and tokens are found by it. Not a password hasher:
-  those are slow on purpose, against guessable secrets, and every request
-  would pay; not an HMAC with `SECRET_KEY`: it wouldn't make a leaked hash
-  less useless, but rotating the key would invalidate every token.
-  Lifetimes are short instead: 30 days by default (`TOKEN_LIFETIME_DAYS`).
+  HMAC-SHA256 with `SECRET_KEY` (`salted_hmac`) is stored, and tokens are
+  found by it. Not a password hasher: those are slow on purpose, against
+  guessable secrets, and every request would pay. The HMAC ties tokens to
+  `SECRET_KEY`: a leaked database is useless without it, and rotating it
+  without a fallback revokes every token at once. Tokens are also found
+  under `SECRET_KEY_FALLBACKS`, and moved to the current key when used.
+  Lifetimes are short: 30 days by default (`TOKEN_LIFETIME_DAYS`).
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.

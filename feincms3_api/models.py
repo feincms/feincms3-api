@@ -1,10 +1,10 @@
-import hashlib
 import secrets
 from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.utils.translation import gettext_lazy as _
 
 from feincms3_api.conf import config
@@ -13,18 +13,28 @@ from feincms3_api.conf import config
 PREFIX = "f3api_"
 
 
-def _hash(secret):
+KEY_SALT = "feincms3_api.APIToken"
+
+
+def _hash(secret, key=None):
     """
-    SHA-256, not a password hasher or an HMAC
+    An HMAC-SHA256 of the secret with ``SECRET_KEY``, not a password hasher
 
     Password hashers are slow on purpose, against guessing secrets people
     choose; a token is 32 random bytes, which can't be guessed, and every
     request would pay for the slowness. Their salt would also need an id in
-    the secret to find the row. An HMAC with ``SECRET_KEY`` wouldn't make a
-    leaked hash any less useless, but would invalidate every token when the
-    key is rotated. Tokens are found by this hash, through a unique index.
+    the secret to find the row. The HMAC ties the tokens to ``SECRET_KEY``:
+    a leaked database is useless without it, and rotating it without a
+    fallback revokes every token at once. Tokens are found by this hash,
+    through a unique index.
     """
-    return hashlib.sha256(secret.encode()).hexdigest()
+    return salted_hmac(KEY_SALT, secret, secret=key, algorithm="sha256").hexdigest()
+
+
+def _hashes(secret):
+    """The hash with the current key first, then with the fallbacks"""
+    keys = [settings.SECRET_KEY, *getattr(settings, "SECRET_KEY_FALLBACKS", ())]
+    return [_hash(secret, key) for key in keys]
 
 
 def default_expiry():
@@ -45,13 +55,19 @@ class APITokenQuerySet(models.QuerySet):
         """The valid token with this secret, or ``None``"""
         if not secret or not secret.startswith(PREFIX):
             return None
+        current, *fallbacks = _hashes(secret)
         token = (
-            self.filter(hash=_hash(secret), expires_at__gt=timezone.now())
+            self.filter(hash__in=[current, *fallbacks], expires_at__gt=timezone.now())
             .select_related("user")
             .first()
         )
         if token is None or not (token.user.is_active and token.user.is_staff):
             return None
+        if token.hash != current:
+            # Found with a fallback key: move it to the current one, so it
+            # survives the fallback being removed.
+            type(token).objects.filter(pk=token.pk).update(hash=current)
+            token.hash = current
         now = timezone.now()
         if token.last_used_at is None or token.last_used_at < now - timedelta(
             minutes=1
