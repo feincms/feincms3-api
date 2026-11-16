@@ -2,6 +2,12 @@
 
 ## Next version
 
+- Writes go through the admin's formsets and save hooks: every inline is
+  bound to the formset the admin would build, and saving runs
+  `save_form()`, `save_model()`, `save_related()` (so `save_formset()`) and
+  `construct_change_message()`, also for one plugin's `PATCH`.
+- Added `inlines`: the admin's inlines which aren't plugins, read and
+  written by type, each type given replaced like a region.
 - Added `Resource.check()` for problems which don't stop saving, returned
   in `meta.warnings`, now `{"level", "message", "path"}` objects, and
   `feincms3_api.forms.ConfiguredFormResource`, which reports the

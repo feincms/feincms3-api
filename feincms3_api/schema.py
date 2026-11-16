@@ -32,6 +32,10 @@ class SchemaMixin:
                     "type": resource.type,
                     "title": str(resource.model._meta.verbose_name),
                     "region_sets": region_sets,
+                    "inlines": [
+                        label(inline.model)
+                        for inline in resource.other_inlines(request)
+                    ],
                 }
             )
             types[resource.type] = {
@@ -44,6 +48,11 @@ class SchemaMixin:
                     "plugin_of": resource.type,
                     "container": bool(getattr(inline.model, "container", False)),
                 }
+            for inline in resource.other_inlines(request):
+                types[label(inline.model)] = {
+                    "title": str(inline.model._meta.verbose_name),
+                    "inline_of": resource.type,
+                }
         return {"resources": resources, "types": types}
 
     def contexts(self, request):
@@ -52,10 +61,13 @@ class SchemaMixin:
             if not resource.has_view_permission(request):
                 continue
             yield resource.type, resource.context(request, None, self)
-            for inline in resource.plugin_inlines(request):
+            for inline in [
+                *resource.plugin_inlines(request),
+                *resource.other_inlines(request),
+            ]:
                 yield (
                     label(inline.model),
-                    resource.plugin_context(request, inline, None, self),
+                    resource.inline_context(request, inline, None, self),
                 )
 
     def type_schema(self, request, type_label):

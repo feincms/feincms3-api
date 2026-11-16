@@ -102,6 +102,9 @@ testapp.rating (plugin of testapp.form)
   help_text: text
 testapp.richtext (plugin of testapp.page)
   text: html
+testapp.session (inline of testapp.training)
+  title: text
+  subscription_url: link
 testapp.simplefield_select (plugin of testapp.form)
   name: machine
   label: text
@@ -118,6 +121,8 @@ testapp.simplefield_text (plugin of testapp.form)
   placeholder: text
   default_value: machine
   max_length: integer
+testapp.speaker (inline of testapp.training)
+  person: ref testapp.person
 testapp.tab (plugin of testapp.tablist)
   title: text
   text: html

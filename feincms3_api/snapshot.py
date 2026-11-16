@@ -37,6 +37,8 @@ def snapshot(api):
         info = schema["types"][type]
         if resource := info.get("resource"):
             lines.append(f"{type} (resource {resource})")
+        elif inline_of := info.get("inline_of"):
+            lines.append(f"{type} (inline of {inline_of})")
         else:
             container = ", container" if info["container"] else ""
             lines.append(f"{type} (plugin of {info['plugin_of']}{container})")

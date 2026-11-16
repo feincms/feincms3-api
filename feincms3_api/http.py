@@ -13,6 +13,7 @@ from feincms3_api.reading import _bool
 class ObjectIn(Schema):
     fields: dict[str, Any] | None = None
     content: dict[str, Any] | None = None
+    inlines: dict[str, Any] | None = None
 
 
 class ContentIn(Schema):

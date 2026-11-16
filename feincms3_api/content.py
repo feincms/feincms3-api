@@ -1,39 +1,24 @@
 """
-Planning content writes: every check first, then the saves
+Planning a write: every check first, then the saves
 
-A content write is planned completely before anything is saved: the
-regions, the plugin types allowed in them, the depths, the permissions and
-every plugin's form. Problems are collected with their paths, so a write
+A write is planned completely before anything is saved: the regions, the
+plugin types allowed in them, the depths, the permissions, and what happens
+to every row of every inline (plugins and other inlines): it stays, changes,
+is added or deleted. Problems are collected with their paths, so a write
 fails as a whole with all of them listed, or succeeds as a whole.
+
+The rows are then bound to the admin's formsets (``formsets.py``).
 """
 
-import dataclasses
 import json
 
+from content_editor.admin import ContentEditorInline
 from django.contrib.admin.models import LogEntry
 from django.utils.translation import gettext as _
 
-from feincms3_api.adapters import form_errors
 from feincms3_api.codecs import label
-from feincms3_api.resources import allowed_types
-
-
-STRUCTURAL = ("region", "ordering", "depth")
-
-
-@dataclasses.dataclass
-class PluginSave:
-    form: object
-    inline: object
-    created: bool
-    path: str
-
-
-@dataclasses.dataclass
-class ContentPlan:
-    saves: list = dataclasses.field(default_factory=list)
-    deletes: list = dataclasses.field(default_factory=list)
-    errors: list = dataclasses.field(default_factory=list)
+from feincms3_api.formsets import Row, bind_formset, formset_errors, prefixes
+from feincms3_api.resources import allowed_types, fk_name
 
 
 def check_depths(items, containers, path):
@@ -68,29 +53,81 @@ def check_depths(items, containers, path):
     return errors
 
 
-class _Planner:
-    """Plans replacing regions; ``plan_content()`` is the entry point"""
+class Planner:
+    """
+    What a write does to the rows of an object's inlines
+
+    ``obj`` may be new; for an existing object, every row it has starts
+    out unchanged. ``content()``, ``inlines()`` and ``plugin()`` change
+    them, ``bind()`` binds them to the admin's formsets.
+    """
 
     def __init__(self, api, resource, request, obj):
         self.api, self.resource, self.request, self.obj = api, resource, request, obj
         self.existing_obj = obj if obj.pk is not None else None
-        inlines = resource.plugin_inlines(request, self.existing_obj)
-        self.by_type = {label(inline.model): inline for inline in inlines}
+        self.errors = []
+        self.inlines = resource.model_admin.get_inline_instances(
+            request, self.existing_obj
+        )
+        plugin_inlines = [i for i in self.inlines if _is_plugin_inline(i)]
+        self.by_type = {label(inline.model): inline for inline in self.inlines}
         self.containers = {
-            t for t, i in self.by_type.items() if getattr(i.model, "container", False)
+            label(i.model)
+            for i in plugin_inlines
+            if getattr(i.model, "container", False)
         }
         self.region_keys = [region.key for region in resource.regions(obj)]
-        self.allowed = allowed_types(inlines, self.region_keys)
-        visible, _hidden = resource.plugins(request, inlines, obj)
-        self.existing = {(label(type(p)), p.pk): p for p, _inline in visible}
+        self.allowed = allowed_types(plugin_inlines, self.region_keys)
+
+        self.rows = {inline: [] for inline in self.inlines}
+        self.existing = {}
+        visible, _hidden = resource.plugins(request, plugin_inlines, obj)
+        positions = {}
+        for plugin, inline in visible:
+            index = positions.get(plugin.region, 0)
+            positions[plugin.region] = index + 1
+            self._add_existing(inline, plugin, f"content.{plugin.region}[{index}]")
+        for inline in self.inlines:
+            if not _is_plugin_inline(inline):
+                type_label = label(inline.model)
+                for index, item in enumerate(
+                    resource.inline_objects(request, inline, self.existing_obj)
+                ):
+                    self._add_existing(inline, item, f"inlines.{type_label}[{index}]")
         self.used = set()
-        self.contexts = {}
-        self.plan = ContentPlan()
+        self._fields = {}
+
+    def _add_existing(self, inline, instance, path):
+        row = Row(instance=instance, path=path)
+        self.rows[inline].append(row)
+        self.existing[label(type(instance)), instance.pk] = row
 
     def error(self, path, message):
-        self.plan.errors.append({"path": path, "message": message})
+        self.errors.append({"path": path, "message": message})
 
-    def region(self, key, items, path):
+    # Content ################################################################
+
+    def content(self, content, path="content"):
+        """
+        Replace the regions in ``content``. Regions which aren't given are
+        left alone; plugins without an inline for the user (no permission)
+        are never touched.
+        """
+        if not isinstance(content, dict):
+            self.error(path, "Expected an object.")
+            return
+        for key, items in content.items():
+            self._region(key, items, f"{path}.{key}")
+        for (type_label, plugin_id), row in self.existing.items():
+            inline = self.by_type[type_label]
+            if (
+                _is_plugin_inline(inline)
+                and row.instance.region in content
+                and (type_label, plugin_id) not in self.used
+            ):
+                self._delete(inline, row, f"{path}.{row.instance.region}")
+
+    def _region(self, key, items, path):
         if key not in self.region_keys:
             regions = ", ".join(self.region_keys) or "none"
             self.error(path, f"Not a region of this object; its regions are {regions}.")
@@ -98,146 +135,175 @@ class _Planner:
         if not isinstance(items, list):
             self.error(path, "Expected a list.")
             return
-        self.plan.errors.extend(check_depths(items, self.containers, path))
+        self.errors.extend(check_depths(items, self.containers, path))
         for index, item in enumerate(items):
-            self.item(key, index, item, f"{path}[{index}]")
+            item_path = f"{path}[{index}]"
+            if not isinstance(item, dict):
+                self.error(item_path, "Expected an object.")
+                continue
+            type_label = item.get("type")
+            inline = self.by_type.get(type_label)
+            if inline is None or not _is_plugin_inline(inline):
+                self.error(
+                    f"{item_path}.type",
+                    f"{type_label!r} isn't a plugin type of this object, or not"
+                    " one you may use.",
+                )
+                continue
+            if type_label not in self.allowed[key]:
+                self.error(
+                    f"{item_path}.type", f"{type_label} isn't allowed in region {key}."
+                )
+                continue
+            extra = {
+                "region": key,
+                "ordering": (index + 1) * 10,
+                "depth": item.get("depth", 0),
+            }
+            base_fields = self._base_fields(inline)
+            extra = {
+                name: value for name, value in extra.items() if name in base_fields
+            }
+            self._item(inline, item, item_path, extra)
 
-    def item(self, key, index, item, path):
-        if not isinstance(item, dict):
+    def _base_fields(self, inline):
+        if inline not in self._fields:
+            formset_class = inline.get_formset(self.request, self.existing_obj)
+            self._fields[inline] = formset_class.form.base_fields
+        return self._fields[inline]
+
+    # Other inlines ##########################################################
+
+    def other_inlines(self, inlines, path="inlines"):
+        """Replace the objects of the inline types in ``inlines``"""
+        if not isinstance(inlines, dict):
             self.error(path, "Expected an object.")
             return
-        type_label = item.get("type")
-        if (inline := self.by_type.get(type_label)) is None:
-            self.error(
-                f"{path}.type",
-                f"{type_label!r} isn't a plugin type of this object, or not one"
-                " you may use.",
-            )
-            return
-        if type_label not in self.allowed[key]:
-            self.error(f"{path}.type", f"{type_label} isn't allowed in region {key}.")
-            return
-        found = self.instance(inline, type_label, item.get("id"), path)
-        if found is None:
-            return
-        plugin, created = found
-        if inline not in self.contexts:
-            self.contexts[inline] = self.resource.plugin_context(
-                self.request, inline, self.existing_obj, self.api
-            )
-        context = self.contexts[inline]
-        structural = {
-            "region": key,
-            "ordering": (index + 1) * 10,
-            "depth": item.get("depth", 0),
-        }
-        form, errors = self.api.adapters.lookup(type_label).bind(
-            context,
-            plugin,
-            item.get("fields", {}),
-            path=f"{path}.fields",
-            extra={
-                name: value
-                for name, value in structural.items()
-                if name in context.form_class.base_fields
-            },
-        )
-        self.plan.errors.extend(errors)
-        if form is not None:
-            self.plan.saves.append(PluginSave(form, inline, created, path))
+        for type_label, items in inlines.items():
+            type_path = f"{path}.{type_label}"
+            inline = self.by_type.get(type_label)
+            if inline is None or _is_plugin_inline(inline):
+                self.error(
+                    type_path,
+                    f"{type_label!r} isn't an inline of this object, or not one"
+                    " you may use.",
+                )
+                continue
+            if not isinstance(items, list):
+                self.error(type_path, "Expected a list.")
+                continue
+            for index, item in enumerate(items):
+                item_path = f"{type_path}[{index}]"
+                if not isinstance(item, dict):
+                    self.error(item_path, "Expected an object.")
+                    continue
+                if unknown := set(item) - {"id", "fields"}:
+                    for key in sorted(unknown):
+                        self.error(f"{item_path}.{key}", "Unknown key.")
+                    continue
+                self._item(inline, {"type": type_label, **item}, item_path, {})
+            for row in self.rows[inline]:
+                if not row.new and (type_label, row.instance.pk) not in self.used:
+                    self._delete(inline, row, type_path)
 
-    def instance(self, inline, type_label, plugin_id, path):
-        """``(plugin, created)``: the existing plugin, or a new one"""
-        if plugin_id is None:
+    # One plugin #############################################################
+
+    def plugin(self, inline, plugin, wire):
+        """Change one plugin's ``fields``"""
+        row = self.existing[label(type(plugin)), plugin.pk]
+        row.wire, row.path = wire, ""
+
+    # Rows ###################################################################
+
+    def _item(self, inline, item, path, extra):
+        type_label = item["type"]
+        if (plugin_id := item.get("id")) is None:
             if not inline.has_add_permission(self.request, self.existing_obj):
                 self.error(path, "No permission to add it.")
-                return None
-            plugin = inline.model()
-            setattr(plugin, inline.fk_name, self.obj)
-            return plugin, True
-        if (plugin := self.existing.get((type_label, plugin_id))) is None:
+                return
+            instance = inline.model()
+            setattr(instance, fk_name(inline), self.obj)
+            self.rows[inline].append(
+                Row(instance, path, item.get("fields") or {}, extra)
+            )
+            return
+        if (row := self.existing.get((type_label, plugin_id))) is None:
             self.error(f"{path}.id", f"No {type_label} with this id on this object.")
-            return None
+            return
         if (type_label, plugin_id) in self.used:
             self.error(f"{path}.id", "Used twice.")
-            return None
+            return
         self.used.add((type_label, plugin_id))
-        if not inline.has_change_permission(self.request, self.existing_obj):
+        row.path, row.extra = path, extra
+        row.wire = item.get("fields") or {}
+        changes_something = row.wire or any(
+            getattr(row.instance, name, value) != value for name, value in extra.items()
+        )
+        if changes_something and not inline.has_change_permission(
+            self.request, self.existing_obj
+        ):
             self.error(path, "No permission to change it.")
-            return None
-        return plugin, False
 
-    def deletions(self, content, path):
-        """The plugins of the replaced regions which aren't given anymore"""
-        for (type_label, plugin_id), plugin in self.existing.items():
-            if plugin.region not in content or (type_label, plugin_id) in self.used:
-                continue
-            if not self.by_type[type_label].has_delete_permission(
-                self.request, self.existing_obj
-            ):
-                self.error(
-                    f"{path}.{plugin.region}",
-                    f"Leaves out {type_label} {plugin_id}, which you have no"
-                    " permission to delete.",
-                )
-            self.plan.deletes.append(plugin)
+    def _delete(self, inline, row, path):
+        row.delete = True
+        if not (
+            inline.can_delete
+            and inline.has_delete_permission(self.request, self.existing_obj)
+        ):
+            self.error(
+                path,
+                f"Leaves out {label(type(row.instance))} {row.instance.pk}, which"
+                " you have no permission to delete.",
+            )
+
+    # Formsets ###############################################################
+
+    def bind(self, target):
+        """``(bound formsets, errors)``: the rows, bound to the admin's
+        formsets of ``target`` (the object as the form made it)"""
+        bound, errors = [], []
+        formset_classes = [
+            inline.get_formset(self.request, self.existing_obj)
+            for inline in self.inlines
+        ]
+        for inline, prefix in zip(self.inlines, prefixes(formset_classes), strict=True):
+            context = self.resource.inline_context(
+                self.request, inline, self.existing_obj, self.api
+            )
+            one, bind_errors = bind_formset(
+                self.request,
+                inline,
+                target,
+                self.rows[inline],
+                context,
+                self.api.adapters.lookup(context.type),
+                prefix=prefix,
+                path="content"
+                if _is_plugin_inline(inline)
+                else f"inlines.{context.type}",
+            )
+            bound.append(one)
+            errors.extend(bind_errors)
+        return bound, errors
 
 
-def plan_content(api, resource, request, obj, content, *, path="content"):
-    """
-    Plan replacing the regions in ``content`` of ``obj`` (which may not be
-    saved yet). Regions which aren't given are left alone; plugins without
-    an inline for the user (no permission) are never touched.
-    """
-    if not isinstance(content, dict):
-        return ContentPlan(errors=[{"path": path, "message": "Expected an object."}])
-    planner = _Planner(api, resource, request, obj)
-    for key, items in content.items():
-        planner.region(key, items, f"{path}.{key}")
-    planner.deletions(content, path)
-    return planner.plan
+def _is_plugin_inline(inline):
+    return isinstance(inline, ContentEditorInline)
 
 
-def validate_plan(plan):
-    """Validate the planned forms; with the plan's own errors, all of them"""
-    errors = list(plan.errors)
-    for save in plan.saves:
-        if not save.form.is_valid():
-            errors.extend(form_errors(save.form, f"{save.path}.fields"))
+def validate_formsets(bound):
+    errors = []
+    for one in bound:
+        if not one.formset.is_valid():
+            errors.extend(formset_errors(one))
     return errors
 
 
-def save_plan(plan, obj):
-    """Save a validated plan; returns ``(created, log entries)``"""
-    created, messages = [], []
-    for save in plan.saves:
-        plugin = save.form.save(commit=False)
-        setattr(plugin, save.inline.fk_name, obj)
-        plugin.save()
-        save.form.save_m2m()
-        name = str(plugin._meta.verbose_name)
-        if save.created:
-            created.append((label(type(plugin)), plugin.pk))
-            messages.append({"added": {"name": name, "object": str(plugin)}})
-        elif changed := [
-            str(save.form.fields[field].label or field)
-            for field in save.form.changed_data
-            if field not in STRUCTURAL
-        ]:
-            messages.append(
-                {"changed": {"name": name, "object": str(plugin), "fields": changed}}
-            )
-    for plugin in plan.deletes:
-        messages.append(
-            {
-                "deleted": {
-                    "name": str(plugin._meta.verbose_name),
-                    "object": str(plugin),
-                }
-            }
-        )
-        plugin.delete()
-    return created, messages
+def created_objects(bound):
+    """``(type, id)`` of the objects the saved formsets added"""
+    return [
+        (label(type(obj)), obj.pk) for one in bound for obj in one.formset.new_objects
+    ]
 
 
 def log_message(entries):

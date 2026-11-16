@@ -63,12 +63,17 @@ json-schema-editor's `fastjsonschema` check) and who may do what
 
 The API reuses all of that instead of describing it a second time:
 
-- **Writes go through the admin's forms.** `ModelAdmin.get_form(request,
-  obj)` for the object, the inline's form for each plugin. The wire value is
-  turned into form data, `form.is_valid()` runs exactly the validation the
-  admin runs, `form.save()` saves. A plugin with custom validation behaves
-  the same through the API and in the admin, without the project writing
-  anything for the API.
+- **Writes go through the admin's forms and hooks.** `ModelAdmin.get_form(
+  request, obj)` for the object, and for every inline (plugins and others)
+  the formset `inline.get_formset()` returns, with the admin's prefixes and
+  querysets and a form for every row, as a POST from the change view would
+  have. The wire values are turned into form data, the forms and formsets
+  run exactly the validation the admin runs (formset `clean()`s and the
+  check for protected objects included), and saving goes through
+  `save_form()`, `save_model()`, `save_related()` and so `save_formset()`,
+  logged with `construct_change_message()`. A plugin with custom validation
+  or a project hooking `save_formset()` behaves the same through the API
+  and in the admin, without the project writing anything for the API.
 - **Permissions and visibility** come from the `ModelAdmin` and its inlines:
   `get_queryset(request)` decides what can be found at all,
   `has_view/add/change/delete_permission(request, obj)` what can be done. A
@@ -91,9 +96,14 @@ configuration), **Django REST Framework** (django-ninja is what Wagtail's
 new API uses, and gives typed endpoints and OpenAPI with less code).
 
 The cost: the admin forms expect a request, and admin code sometimes assumes
-a browser (messages, redirects). Only `get_form`, `get_formset`/inline forms,
-`get_queryset`, `get_fields`/`get_readonly_fields` and the permission methods
-are called; anything else in a `ModelAdmin` is never touched.
+a browser (messages, redirects, `request.POST`). Called are `get_form`,
+`get_inline_instances` and `get_formset`, `get_queryset`, the permission
+methods, and the save path of the change view (`save_form`, `save_model`,
+`save_related`, `save_formset`, `construct_change_message`, `log_*`);
+`delete_model` for deletions. Hooks reading `request.POST` (content-editor's
+cloning, feincms3-forms' validation messages) see an empty one; the forms'
+validation reaches the API as `meta.warnings` through `Resource.check()`
+instead.
 
 ## What is exposed: resources
 
@@ -371,7 +381,22 @@ Lists return `{"count", "items"}`, items without `content` unless
 
 This is what the admin does on save: all inlines in one request. The plugin
 `PATCH` is for the small edits (one link, one typo) without sending the whole
-region.
+region; it goes through the same formsets and hooks.
+
+**Other inlines.** Inlines which aren't plugins (a training's sessions, a
+`TabularInline` of anything) are `inlines` on the wire, by type, each object
+`{"id", "fields"}` in the formset's order:
+
+```json
+"inlines": {
+  "events.session": [{"id": 4, "fields": {"title": "Morning"}}]
+}
+```
+
+Writing works as with regions: a type given in `inlines` is replaced (with
+`id` changed, without created, left out deleted), types not given are left
+alone. Errors of the formset's own `clean()` are at `inlines.events.session`.
+`/schema/` lists each resource's `inlines`, `/schema/{type}/` their fields.
 
 Every write is one transaction. All forms are validated first, and all
 errors are collected before anything is saved, so a request fails as a whole
@@ -395,7 +420,7 @@ APIs, files) run in a dry run too; the docs must say so.
 
 **Concurrent edits.** feincms3 objects have no revision counter, and editors
 keep using the admin. `GET` returns an `ETag`, a hash of the object's
-fields and content in wire format. Every `PATCH`, `PUT` and `DELETE` needs
+fields, content and inlines in wire format. Every `PATCH`, `PUT` and `DELETE` needs
 `If-Match` (`428` without, `412` if the object changed since), the plugin
 `PATCH` included, with the object's ETag. The admin doesn't check anything,
 so an admin save can still overwrite an API write; the other direction is
@@ -488,7 +513,8 @@ fields take uploads. Cabinet's own validation (exactly one file) applies.
 - `DELETE /files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
 - `GET /files/?unused=true` lists files no registered model refers to, the
-  report people ask for anyway. Not built yet.
+  report people ask for anyway. Not built yet, see
+  [#1](https://github.com/feincms/feincms3-api/issues/1).
 - Folders: a tree of `parent` and `name`; deleting a non-empty folder is
   refused.
 

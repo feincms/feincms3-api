@@ -13,6 +13,7 @@ from django.contrib import admin
 from django.contrib.admin.utils import flatten_fieldsets
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db.models import Q
+from django.forms.models import _get_foreign_key
 from django.urls import NoReverseMatch, reverse
 
 from feincms3_api.adapters import Context
@@ -102,9 +103,18 @@ def _read_only(model_admin, request, obj):
     return tuple(read_only)
 
 
+def fk_name(inline):
+    """The inline's foreign key to its parent, as its formset finds it"""
+    return inline.fk_name or _get_foreign_key(inline.parent_model, inline.model).name
+
+
 def etag(wire):
     data = json.dumps(
-        {"fields": wire["fields"], "content": wire.get("content")},
+        {
+            "fields": wire["fields"],
+            "content": wire.get("content"),
+            "inlines": wire.get("inlines"),
+        },
         sort_keys=True,
         default=str,
     )
@@ -207,22 +217,59 @@ class Resource:
         )
 
     def plugin_inlines(self, request, obj=None):
+        """The admin's django-content-editor inlines: the plugins"""
         return [
             inline
             for inline in self.model_admin.get_inline_instances(request, obj)
             if isinstance(inline, ContentEditorInline)
         ]
 
-    def plugin_context(self, request, inline, obj, api):
+    def other_inlines(self, request, obj=None):
+        """The admin's other inlines: ``inlines`` on the wire"""
+        return [
+            inline
+            for inline in self.model_admin.get_inline_instances(request, obj)
+            if not isinstance(inline, ContentEditorInline)
+        ]
+
+    def inline_context(self, request, inline, obj, api):
+        """The context of a plugin's or another inline's ``fields``"""
+        exclude = {fk_name(inline)}
+        if isinstance(inline, ContentEditorInline):
+            exclude |= STRUCTURAL_FIELDS
         return Context(
             type=label(inline.model),
             model=inline.model,
             form_class=inline.get_formset(request, obj).form,
             read_only=_read_only(inline, request, obj),
-            exclude=STRUCTURAL_FIELDS | {inline.fk_name},
+            exclude=frozenset(exclude),
             codecs=api.codecs,
             request=request,
         )
+
+    def inline_objects(self, request, inline, obj):
+        """The objects of another inline, as the admin's formset has them"""
+        if obj is None or obj.pk is None:
+            return []
+        queryset = inline.get_queryset(request).filter(**{fk_name(inline): obj})
+        if not queryset.ordered:
+            queryset = queryset.order_by(inline.model._meta.pk.name)
+        return list(queryset)
+
+    def read_inlines(self, request, obj, api):
+        """``{type: [{"id", "fields"}]}`` of the other inlines, or ``None``"""
+        inlines = self.other_inlines(request, obj)
+        if not inlines:
+            return None
+        result = {}
+        for inline in inlines:
+            context = self.inline_context(request, inline, obj, api)
+            adapter = api.adapters.lookup(context.type)
+            result[context.type] = [
+                {"id": item.pk, "fields": adapter.to_wire(context, item)}
+                for item in self.inline_objects(request, inline, obj)
+            ]
+        return result
 
     def regions(self, obj):
         return list(getattr(obj, "regions", None) or ())
@@ -336,7 +383,7 @@ class Resource:
         for plugin in plugins:
             inline = by_model[type(plugin)]
             if inline not in contexts:
-                contexts[inline] = self.plugin_context(request, inline, obj, api)
+                contexts[inline] = self.inline_context(request, inline, obj, api)
             context = contexts[inline]
             by_region.setdefault(plugin.region, []).append(
                 {
@@ -379,6 +426,8 @@ class Resource:
             data, containers = self.read_content(request, obj, api, warnings)
             if data is not None:
                 wire["content"] = data
+            if (inlines := self.read_inlines(request, obj, api)) is not None:
+                wire["inlines"] = inlines
         warnings.extend(self.check(request, obj))
         # The ETag is computed from the flat form, whatever is returned.
         wire["meta"] = self.meta(request, obj, wire) | {"warnings": warnings}
@@ -409,7 +458,7 @@ class Resource:
         if (found := self.get_plugin(request, obj, type_label, plugin_id)) is None:
             return None
         plugin, inline = found
-        context = self.plugin_context(request, inline, obj, api)
+        context = self.inline_context(request, inline, obj, api)
         return {
             "type": type_label,
             "id": plugin.pk,

@@ -72,6 +72,19 @@ def current_data(form):
     return data
 
 
+def prepare_form(form, context, *, keep=()):
+    """
+    Make a bound form take the API's data: fields the API sets itself (e.g.
+    a plugin's parent) aren't the form's business unless they're in
+    ``keep``, and the values are cleaned as they are (``RawWidget``)
+    """
+    for name in context.exclude:
+        if name not in keep:
+            form.fields.pop(name, None)
+    for form_field in form.fields.values():
+        form_field.widget = RawWidget()
+
+
 def form_errors(form, path):
     """A bound form's errors as ``[{"path", "message"}]``"""
     return [
@@ -164,9 +177,9 @@ class FormAdapter:
         _remove_paths(data, context.excluded_paths)
         return data
 
-    def bind(self, context, instance, wire, *, path, extra=None):
+    def form_data(self, context, instance, wire, *, path, extra=None):
         """
-        ``(bound form, errors)``: the current values, with the wire fields
+        ``(form data, errors)``: the current values, with the wire fields
         decoded over them, and ``extra`` (form data, e.g. a plugin's region)
 
         A field which isn't sent keeps its value. Read-only fields may be
@@ -181,7 +194,11 @@ class FormAdapter:
         by_name = {field.name: field for field in fields}
         unbound = context.form_class(instance=instance)
         data = current_data(unbound)
-        current = self.to_wire(context, instance) if instance is not None else {}
+        current = (
+            self.to_wire(context, instance)
+            if wire and instance is not None and instance.pk is not None
+            else {}
+        )
 
         for name, value in wire.items():
             field_path = f"{path}.{name}"
@@ -197,14 +214,15 @@ class FormAdapter:
                     errors.append({"path": field_path, "message": str(exc)})
 
         data.update(extra or {})
+        return data, errors
+
+    def bind(self, context, instance, wire, *, path, extra=None):
+        """``(bound form, errors)``, with ``form_data()``"""
+        data, errors = self.form_data(context, instance, wire, path=path, extra=extra)
+        if data is None:
+            return None, errors
         form = context.form_class(data=data, files={}, instance=instance)
-        # Fields the API sets itself (e.g. a plugin's parent) aren't the
-        # form's business, unless their values are in ``extra``.
-        for name in context.exclude:
-            if name not in (extra or {}):
-                form.fields.pop(name, None)
-        for form_field in form.fields.values():
-            form_field.widget = RawWidget()
+        prepare_form(form, context, keep=extra or ())
         return form, errors
 
     def decode(self, context, field, value, current):

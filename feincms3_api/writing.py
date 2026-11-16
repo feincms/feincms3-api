@@ -14,7 +14,12 @@ from django.db.models import ProtectedError
 from feincms3_api.adapters import form_errors
 from feincms3_api.codecs import label
 from feincms3_api.conf import config
-from feincms3_api.content import log_message, plan_content, save_plan, validate_plan
+from feincms3_api.content import (
+    Planner,
+    created_objects,
+    log_message,
+    validate_formsets,
+)
 from feincms3_api.errors import (
     ConflictError,
     ForbiddenError,
@@ -80,72 +85,90 @@ class WritingMixin:
             request, name, pk, {"content": content}, if_match=if_match, dry_run=dry_run
         )
 
-    def _write(self, request, resource, obj, payload, *, dry_run):
+    def _write(
+        self, request, resource, obj, payload, *, dry_run, plugin=None, read=None
+    ):
+        """
+        Write as the admin's change view does: the object's form, the
+        formsets of all its inlines, ``save_form()``, ``save_model()``,
+        ``save_related()`` (and so ``save_formset()``) and the change
+        message; ``plugin`` is ``(inline, plugin)`` for one plugin's fields
+        """
+        allowed = {"fields"} if plugin else {"fields", "content", "inlines"}
         if not isinstance(payload, dict):
             raise ValidationFailedError(
                 [{"path": "", "message": "Expected an object."}]
             )
-        if unknown := set(payload) - {"fields", "content"}:
+        if unknown := set(payload) - allowed:
             raise ValidationFailedError(
                 [{"path": key, "message": "Unknown key."} for key in sorted(unknown)]
             )
-        model_admin = resource.model_admin
         adding = obj is None
         with transaction.atomic():
-            errors, form, target = [], None, obj
-            if adding or payload.get("fields") is not None:
-                context = resource.context(request, obj, self)
-                form, bind_errors = self.adapters.lookup(resource.type).bind(
-                    context, obj, payload.get("fields") or {}, path="fields"
-                )
-                errors.extend(bind_errors)
-                if form is not None:
-                    if not form.is_valid():
-                        errors.extend(form_errors(form, "fields"))
-                    else:
-                        errors.extend(resource.validate_instance(form.instance))
-                    # Validating applied the values, e.g. a new page type
-                    # with other regions for the content below.
-                    target = form.instance
-            plan = None
-            if payload.get("content") is not None:
-                plan = plan_content(self, resource, request, target, payload["content"])
-                errors.extend(validate_plan(plan))
-            if errors:
-                raise ValidationFailedError(errors)
-
-            try:
-                target, messages, created = self._save(
-                    request, resource, form, plan, target, adding=adding
-                )
-            except IntegrityError as exc:
-                # What the forms and checks didn't find, the database did.
-                raise ConflictError(f"The database refused the change: {exc}") from exc
-            if adding:
-                model_admin.log_addition(request, target, log_message(messages))
-            elif messages:
-                model_admin.log_change(request, target, log_message(messages))
-
-            wire = resource.read(request, target, self)
+            form, target, bound = self._validate(
+                request, resource, obj, payload, plugin=plugin
+            )
+            self._save(request, resource, form, target, bound, adding=adding)
+            result = read(target) if read else resource.read(request, target, self)
             if dry_run:
                 transaction.set_rollback(True)
-                _forget_ids(wire, created, adding)
-        return wire
+                if read is None:
+                    _forget_ids(result, created_objects(bound), adding)
+        return result
 
-    def _save(self, request, resource, form, plan, target, *, adding):
-        model_admin = resource.model_admin
-        messages, created = [], []
-        if form is not None:
-            target = form.save(commit=False)
-            model_admin.save_model(request, target, form, not adding)
-            form.save_m2m()
-            messages.extend(
-                model_admin.construct_change_message(request, form, None, adding)
+    def _validate(self, request, resource, obj, payload, *, plugin):
+        """``(form, target, bound formsets)``, or every problem raised"""
+        context = resource.context(request, obj, self)
+        form, errors = self.adapters.lookup(resource.type).bind(
+            context,
+            obj,
+            {} if plugin else (payload.get("fields") or {}),
+            path="fields",
+        )
+        if form is None:
+            raise ValidationFailedError(errors)
+        if form.is_valid():
+            errors.extend(resource.validate_instance(form.instance))
+            target = resource.model_admin.save_form(
+                request, form, change=obj is not None
             )
-        if plan is not None:
-            created, plan_messages = save_plan(plan, target)
-            messages.extend(plan_messages)
-        return target, messages, created
+        else:
+            errors.extend(form_errors(form, "fields"))
+            # Validating applied the values, e.g. a new page type with other
+            # regions for the content below.
+            target = form.instance
+
+        planner = Planner(self, resource, request, target)
+        if plugin:
+            planner.plugin(*plugin, payload.get("fields") or {})
+        if payload.get("content") is not None:
+            planner.content(payload["content"])
+        if payload.get("inlines") is not None:
+            planner.other_inlines(payload["inlines"])
+        errors.extend(planner.errors)
+        bound, bind_errors = planner.bind(target)
+        errors.extend(bind_errors)
+        errors.extend(validate_formsets(bound))
+        if errors:
+            raise ValidationFailedError(errors)
+        return form, target, bound
+
+    def _save(self, request, resource, form, target, bound, *, adding):
+        model_admin = resource.model_admin
+        formsets = [one.formset for one in bound]
+        try:
+            model_admin.save_model(request, target, form, not adding)
+            model_admin.save_related(request, form, formsets, not adding)
+        except IntegrityError as exc:
+            # What the forms and checks didn't find, the database did.
+            raise ConflictError(f"The database refused the change: {exc}") from exc
+        except ProtectedError as exc:
+            raise _protected(exc) from exc
+        messages = model_admin.construct_change_message(request, form, formsets, adding)
+        if adding:
+            model_admin.log_addition(request, target, log_message(messages))
+        elif messages:
+            model_admin.log_change(request, target, log_message(messages))
 
     def update_plugin(
         self,
@@ -171,44 +194,22 @@ class WritingMixin:
         if not inline.has_change_permission(request, obj):
             raise ForbiddenError(f"No permission to change {type_label}.")
         self._check_etag(request, resource, obj, if_match)
-        if not isinstance(payload, dict):
-            raise ValidationFailedError(
-                [{"path": "", "message": "Expected an object."}]
+
+        def read(target):
+            return (
+                resource.read_plugin(request, target, self, type_label, plugin.pk),
+                resource.read(request, target, self)["meta"]["etag"],
             )
 
-        with transaction.atomic():
-            context = resource.plugin_context(request, inline, obj, self)
-            form, errors = self.adapters.lookup(type_label).bind(
-                context, plugin, payload.get("fields") or {}, path="fields"
-            )
-            if form is not None and not form.is_valid():
-                errors.extend(form_errors(form, "fields"))
-            if errors:
-                raise ValidationFailedError(errors)
-            plugin = form.save()
-            if changed := [
-                str(form.fields[field].label or field) for field in form.changed_data
-            ]:
-                resource.model_admin.log_change(
-                    request,
-                    obj,
-                    log_message(
-                        [
-                            {
-                                "changed": {
-                                    "name": str(plugin._meta.verbose_name),
-                                    "object": str(plugin),
-                                    "fields": changed,
-                                }
-                            }
-                        ]
-                    ),
-                )
-            wire = resource.read_plugin(request, obj, self, type_label, plugin.pk)
-            etag = resource.read(request, obj, self)["meta"]["etag"]
-            if dry_run:
-                transaction.set_rollback(True)
-        return wire, etag
+        return self._write(
+            request,
+            resource,
+            obj,
+            payload,
+            dry_run=dry_run,
+            plugin=(inline, plugin),
+            read=read,
+        )
 
     def delete(self, request, name, pk, *, if_match, dry_run=False):
         resource, obj = self._get(request, name, pk)
@@ -224,15 +225,19 @@ class WritingMixin:
             try:
                 model_admin.delete_model(request, obj)
             except ProtectedError as exc:
-                raise ConflictError(
-                    "Other objects refer to it.",
-                    protected=[
-                        {"type": label(type(o)), "id": o.pk, "title": str(o)}
-                        for o in exc.protected_objects
-                    ],
-                ) from exc
+                raise _protected(exc) from exc
             if dry_run:
                 transaction.set_rollback(True)
+
+
+def _protected(exc):
+    return ConflictError(
+        "Other objects refer to it.",
+        protected=[
+            {"type": label(type(o)), "id": o.pk, "title": str(o)}
+            for o in exc.protected_objects
+        ],
+    )
 
 
 def _forget_ids(wire, created, adding):
@@ -244,3 +249,7 @@ def _forget_ids(wire, created, adding):
         for plugin in plugins:
             if (plugin["type"], plugin["id"]) in created:
                 plugin["id"] = None
+    for type_label, items in (wire.get("inlines") or {}).items():
+        for item in items:
+            if (type_label, item["id"]) in created:
+                item["id"] = None
