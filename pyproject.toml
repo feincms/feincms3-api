@@ -62,8 +62,6 @@ lint.extend-select = [
   "B",
   # flake8-comprehensions
   "C4",
-  # mmcabe
-  "C90",
   # flake8-django
   "DJ",
   "E",
@@ -98,6 +96,8 @@ lint.extend-ignore = [
   "B905",
   # No line length errors
   "E501",
+  # pylint's refactoring rules (complexity limits, magic values, ...)
+  "PLR",
   "RUF012",
 ]
 lint.per-file-ignores."*/migrat*/*" = [
@@ -112,19 +112,11 @@ lint.per-file-ignores."feincms3_api/http.py" = [
   "FBT002",
 ]
 lint.per-file-ignores."feincms3_api/incubator/*" = [
-  # The incubator isn't held to the package's complexity limits
   "N818",
-  "PLR09",
 ]
 lint.per-file-ignores."tests/*" = [
   # assertIs(value, True)
   "FBT003",
 ]
-lint.per-file-ignores."tests/testapp/test_autotranslate.py" = [
-  "PLR09",
-]
 lint.isort.combine-as-imports = true
 lint.isort.lines-after-imports = 2
-lint.mccabe.max-complexity = 15
-lint.pylint.max-args = 8
-lint.pylint.max-positional-args = 8
