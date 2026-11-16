@@ -1,0 +1,563 @@
+# feincms3-api: spec (draft)
+
+A django-ninja API for reading and writing the content of feincms3 sites:
+pages and other objects with django-content-editor regions and plugins,
+django-json-schema-editor data and django-cabinet files. For scripts,
+importers and agents (e.g. Claude Code with a token and `curl`), next to the
+admin, not instead of it.
+
+It grows out of feincms3-autotranslate (see "Credits"): its content
+introspection becomes this package's core, and its translation pipeline
+lives in an incubator subpackage (see "Translating" and "Layout"). Ideas
+taken from it: explicit allowlists, a committed snapshot of what's exposed,
+dry runs in a rolled-back transaction, errors as report lines instead of
+tracebacks.
+
+## Why
+
+- **Importers.** Relaunches move content from old sites into feincms3. Today
+  that's a one-off script per project against the models. An API with
+  validation is the same script without knowing the plugin models.
+- **Bulk edits.** Meta descriptions for 200 pages, a renamed product in every
+  rich text, a link that moved. Scriptable, reviewable with a dry run.
+- **Agents.** Drafting a page from a briefing, translating a page, finding
+  unused files or pages without a lead. The schema endpoint tells the agent
+  what's allowed where.
+- **Reports.** Inactive pages, empty regions, plugins of a type nobody uses.
+
+## Prior art: Wagtail 8.0
+
+Wagtail 8.0 (2026-08-25) ships a **preview v3 API** that can write: pages,
+images, documents, snippets, revisions, workflows, 50+ admin operations. It's
+opt-in (`wagtail.api.v3` in `INSTALLED_APPS`, URLs mounted by the project),
+built on **Django Ninja and Pydantic**, with OpenAPI docs, bearer tokens and
+Wagtail's permission model. The pitch is "CMS with AI, not AI CMS": no AI
+buttons in the admin, but an API agents can use, with `wagtail-cli` and
+`wagtail-mcp` on top. Rich text can be read as Markdown.
+
+Shape worth copying:
+
+- `GET|POST /pages/`, `GET|PATCH|DELETE /pages/{id}/`, actions as
+  `POST /pages/{id}/actions/{publish,move,copy,…}/`,
+- `GET /schema/` and `GET /schema/{type}/`: the content types and their
+  create/patch/read schemas,
+- StreamField as a list of `{"id", "type", "value"}` blocks,
+- `limit`/`offset` pagination, lists as `{"count", "items"}`.
+
+What doesn't carry over: Wagtail's StreamField blocks are declared in one
+place with one schema system. feincms3 plugins are Django models, each
+project has its own, and the admin inlines decide which plugin goes into
+which region. Wagtail also has drafts, revisions and workflows; feincms3 has
+`is_active` (see "Drafts").
+
+## The central decision: the admin is the source of truth
+
+Every feincms3 site already describes its content in the admin: which
+templates and page types there are, which regions they have, which plugins
+are allowed in which region (`ContentEditorInline.create(model,
+regions=[…])`, `allow_regions`, `deny_regions`), which fields an editor sees
+(`fields`, `fieldsets`, `exclude`, `readonly_fields`), how they're validated
+(form `clean()` methods, `NoembedValidationForm`, prose-editor sanitising,
+json-schema-editor's `fastjsonschema` check) and who may do what
+(`has_*_permission`, `get_queryset`).
+
+The API reuses all of that instead of describing it a second time:
+
+- **Writes go through the admin's forms.** `ModelAdmin.get_form(request,
+  obj)` for the object, the inline's form for each plugin. The wire value is
+  turned into form data, `form.is_valid()` runs exactly the validation the
+  admin runs, `form.save()` saves. A plugin with custom validation behaves
+  the same through the API and in the admin, without the project writing
+  anything for the API.
+- **Permissions and visibility** come from the `ModelAdmin` and its inlines:
+  `get_queryset(request)` decides what can be found at all,
+  `has_view/add/change/delete_permission(request, obj)` what can be done. A
+  role which can't see some configuration in the admin can't see it through
+  the API either.
+- **Regions and allowed plugins** come from the object (`obj.regions`, from
+  its template or page type) and the `ContentEditor`'s inlines.
+
+Why it matters: model fields alone don't say enough. django-json-schema-
+editor's model `JSONField` doesn't validate `data` against the schema (only
+the references); that happens in the form field. Noembed checks and every
+project's form `clean()` live in forms too (prose-editor sanitises in both
+the model and the form field, so that one would survive). An API
+validating with `full_clean()` and its own Pydantic models would accept what
+the admin rejects, and the next editor opening the page gets the error.
+
+Rejected: **Pydantic models generated from the model fields plus
+`full_clean()`** (misses all of the above and duplicates the admin
+configuration), **Django REST Framework** (django-ninja is what Wagtail's
+new API uses, and gives typed endpoints and OpenAPI with less code).
+
+The cost: the admin forms expect a request, and admin code sometimes assumes
+a browser (messages, redirects). Only `get_form`, `get_formset`/inline forms,
+`get_queryset`, `get_fields`/`get_readonly_fields` and the permission methods
+are called; anything else in a `ModelAdmin` is never touched.
+
+## What is exposed: resources
+
+Nothing is exposed unless the project registers it: the registration is the
+one place a reviewer can see what can be read and changed through the API.
+Form submissions, users, orders stay out by construction.
+
+```python
+# app/content_api.py
+from feincms3_api import ContentAPI, ObjectResource, PageResource
+from feincms3_api.cabinet import CabinetResource
+
+from articles.models import Article
+from events.models import Event
+from pages.models import Page
+from tabs.models import TabList
+
+
+content_api = ContentAPI()
+content_api.register(PageResource(Page))
+content_api.register(ObjectResource(Article))
+content_api.register(ObjectResource(Event))
+content_api.register(ObjectResource(TabList, title_field="technical_title"))
+content_api.register(CabinetResource())
+
+# app/api.py: a NinjaAPI of the project's own, or content_api.as_api()
+api.add_router("/content/", content_api.router)
+```
+
+A resource needs the model to be registered in the admin site
+(`admin_site=` if it isn't the default one); that's where its forms,
+permissions and plugins come from. A model with plugins but no
+`ContentEditor` admin is refused at startup.
+
+| Resource | for | adds |
+|---|---|---|
+| `PageResource` | feincms3 `AbstractPage` subclasses | tree (`parent`, `position`), `path`, page types and templates, move |
+| `ObjectResource` | any model, with or without plugins | nothing; articles, events, tab lists, forms |
+| `CabinetResource` | django-cabinet `File` and `Folder` | uploads, folder tree |
+
+Objects with a region per language (a tab list shared between the
+languages, with regions `de`, `fr`, …, rendering the current language's
+region) need nothing special: their regions are regions.
+
+## The wire format
+
+One object, as `GET /content/pages/17/` returns it:
+
+```json
+{
+  "type": "pages.page",
+  "id": 17,
+  "fields": {
+    "title": "Angebot",
+    "slug": "angebot",
+    "parent": {"type": "pages.page", "id": 3},
+    "position": 20,
+    "page_type": "standard",
+    "language_code": "de",
+    "is_active": true,
+    "lead": "<p>…</p>",
+    "header_image": {"type": "cabinet.file", "id": 412},
+    "meta_description": "…"
+  },
+  "meta": {
+    "path": "/de/angebot/",
+    "url": "https://example.com/de/angebot/",
+    "admin_url": "/admin/pages/page/17/change/",
+    "etag": "\"9f2c…\"",
+    "regions": [{"key": "main", "title": "Main", "inherited": false}],
+    "warnings": []
+  },
+  "content": {
+    "main": [
+      {"type": "pages.richtext", "id": 101,
+       "fields": {"text": "<h2>…</h2><p>…</p>", "is_highlighted": false}},
+      {"type": "pages.jsonplugin_key_figures", "id": 102,
+       "fields": {"data": {"title": "…", "figures": [{"title": "…"}]}}},
+      {"type": "pages.button", "id": 103,
+       "fields": {"button_label": "Kontakt", "button_url": "",
+                  "button_page": {"type": "pages.page", "id": 44}}}
+    ]
+  }
+}
+```
+
+- **`type`** is the model's `label_lower`. JSON plugin proxies use the
+  proxy's label (`pages.jsonplugin_key_figures`), as autotranslate's
+  `--list-fields` does, so each has its own schema.
+- **`fields`** are the admin form's fields, in wire format (below).
+  `region`, `ordering`, `depth` and `parent` of plugins never appear: they
+  follow from where the plugin is in `content`.
+- **`content`** maps region keys to plugin lists in order. Container plugins
+  (django-content-editor 10, `container = True`) carry their plugins in
+  `"children": […]`; on save, the nesting becomes `depth`. Nested rather
+  than flat-with-`depth` because a flat list with depths is easy to get
+  wrong by hand and by agents, and the API can't tell a mistake from intent.
+- **Plugins in regions the object doesn't have** (after a page type change)
+  are returned under their region key and listed in `meta.warnings`; the
+  admin keeps them too.
+- **References** are `{"type", "id"}` objects on read; on write a bare id is
+  accepted where the field has one target model. `?expand=references` adds
+  `title` and `url` (pages) or `url`, `name`, `width`, `height`, `alt_text`
+  (cabinet files), so a reader doesn't need one request per reference.
+- **Paths** inside an object use autotranslate's notation:
+  `content.main[2].fields.data.figures[0].title`. Error paths, the schema
+  snapshot and exclusions in the settings all use it.
+
+## Field codecs and plugin adapters
+
+Plugins aren't standardised: each project has its own. That's handled in two
+layers, both registries with built-in entries and room for the project's
+own.
+
+**Codecs** turn one form field into wire format and back, and describe it as
+JSON Schema for `/schema/`. They're looked up by form field class along the
+MRO, so a project's subclass of a prose-editor field uses the prose-editor
+codec without being registered.
+
+| form field | wire | schema |
+|---|---|---|
+| `CharField`, `TextField` widget | string | `maxLength` |
+| `ChoiceField`, `TypedChoiceField` | string | `enum` |
+| `BooleanField`, `IntegerField`, `DecimalField`, date/time fields | as JSON | type, bounds, format |
+| `URLField` | string | `format: uri` |
+| `ModelChoiceField`, `ModelMultipleChoiceField` | reference(s) | target type, nullable |
+| cabinet's `CabinetForeignKey` form field | file reference | target `cabinet.file`, images only if `limit_choices_to` says so |
+| django-prose-editor field | HTML string | `contentMediaType: text/html`, allowed tags from the field's extensions |
+| django-json-schema-editor `JSONEditorField` | the JSON value | the field's own schema, `foreign_key_paths` as references |
+| django-imagefield `PPOIField` | `"0.5x0.5"` | `pattern` |
+
+**Text for people.** Every string in the schema also says what it is, as
+autotranslate's `fields.py` decides today: `"x-feincms3-kind"` is `text`,
+`html`, `link` or `machine` (slugs, paths, choices, enums, anything with a
+`pattern`, feincms3-forms field names). That's what a translating agent
+(see "Translating") or a spell checker needs to know, and the snapshot
+shows it.
+
+A form field without a codec isn't guessed at: the field is left out, and a
+system check warns, naming model, field and form field class. The project
+registers a codec or excludes the field explicitly. The
+`FileField`/`ImageField` of the feincms3 image plugin is such a case in v1
+(see "Out of scope").
+
+**Adapters** decide a plugin's (or object's) `fields` as a whole. The default
+adapter is the admin form with the codecs, and covers every plugin made of
+ordinary fields without any code, e.g. a button plugin with `button_label`,
+`button_url` and `button_page` fields. Adapters shipped:
+
+- **default** (the form's fields through codecs),
+- **feincms3 plugins**: `RichText`, `HTML`, `External`, `Snippet` (template
+  choices from the model), `Image` read-only for now,
+- **json-schema-editor proxies**: `fields.data` with the proxy's `SCHEMA`;
+  the form field validates it, references come from `foreign_key_paths`,
+- **feincms3 mixins on objects**: `page_type`/`template_key` with their
+  choices, `menu`, `language_code`, `translation_of`, `redirect_to_page` and
+  `redirect_to_url`, feincms3-meta's fields.
+
+A project writes an adapter only to change the shape, e.g. to group
+`button_label`, `button_url`, `button_page` into one `button` object:
+
+```python
+from feincms3_api.adapters import FormAdapter, Group
+
+content_api.adapters.register(
+    "pages.button",
+    FormAdapter(groups=[Group("button", prefix="button_")]),
+)
+```
+
+An adapter has three methods, `to_wire(obj)`, `to_form_data(value,
+instance)` and `json_schema()`; anything shaped very differently (a plugin
+storing a list in a `TextField`) subclasses it.
+
+**The snapshot.** `./manage.py f3api_schema` prints every registered type
+with its fields and their kinds, like autotranslate's `--list-fields`. The
+project commits it as a snapshot test: a new plugin or field becomes
+writable through the API only after someone has looked at the diff.
+
+```
+pages.page
+  title, slug, page_type (choice), parent (ref pages.page), lead (html), …
+  regions by page type: standard: main; landing: hero, main; …
+pages.jsonplugin_key_figures (json-schema-editor)
+  data.title, data.figures[].title, data.figures[].description, …
+pages.button
+  button_label, button_url (link), button_page (ref pages.page)
+```
+
+## Endpoints
+
+Under the project's mount point, `{resource}` being the resource's name
+(`pages`, `articles`, …, default: the model's `model_name` pluralised, or
+`name=`):
+
+| | |
+|---|---|
+| `GET /schema/` | resources, their types, regions per template/page type, allowed plugins per region, container plugins |
+| `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
+| `GET /{resource}/` | list: `limit`, `offset`, `q`, filters (`language_code`, `is_active`, `parent`, `path`, `page_type`, `translation_of`, from `list_filter` where possible), `fields=` to thin out |
+| `POST /{resource}/` | create, with or without `content` |
+| `GET /{resource}/{id}/` | one object with its content |
+| `PATCH /{resource}/{id}/` | change fields; `content` if given, see below |
+| `PUT /{resource}/{id}/content/` | replace the content of the regions given |
+| `GET /{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
+| `PATCH /{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
+| `DELETE /{resource}/{id}/` | delete |
+| `POST /pages/{id}/actions/move/` | `parent`, `position` |
+| `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
+| `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
+| `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
+
+Lists return `{"count", "items"}`, items without `content` unless
+`?content=true`.
+
+## Writing content
+
+`PUT /{resource}/{id}/content/` with `{"content": {"main": […]}}`:
+
+- **Regions given are replaced, others are left alone.** An agent rewriting
+  `main` doesn't have to round-trip the sidebar.
+- A plugin **with `id`** is that plugin, updated. It must belong to this
+  object and region set and have the same `type`; changing the type means a
+  new plugin.
+- A plugin **without `id`** is created.
+- A plugin of a replaced region **not in the list** is deleted.
+- Order comes from the list (`ordering` 10, 20, …), `depth` from
+  `children`.
+- Each plugin must be allowed in its region by its inline, and the user
+  needs the inline's add/change/delete permission for what happens to it.
+
+This is what the admin does on save: all inlines in one request. The plugin
+`PATCH` is for the small edits (one link, one typo) without sending the whole
+region.
+
+Every write is one transaction. All forms are validated first, and all
+errors are collected before anything is saved, so a request fails as a whole
+with every problem listed:
+
+```json
+HTTP 422
+{"errors": [
+  {"path": "content.main[3].fields.data.figures[0].title",
+   "message": "This field is required."},
+  {"path": "content.main[5]",
+   "message": "pages.formcontainer isn't allowed in region main."}
+]}
+```
+
+**Dry run.** `?dry_run=true` on every write runs it, including the saves,
+inside a transaction that's rolled back, and returns the object as it would
+be (new plugins with `"id": null`). Its result is what the write will do,
+not a prediction. Signal handlers doing things outside the database (mail,
+APIs, files) run in a dry run too; the docs must say so.
+
+**Concurrent edits.** feincms3 objects have no revision counter, and editors
+keep using the admin. `GET` returns an `ETag`, a hash of the object's
+fields and content in wire format. Every `PATCH`, `PUT` and `DELETE` needs
+`If-Match` (`428` without, `412` if the object changed since), the plugin
+`PATCH` included, with the object's ETag. The admin doesn't check anything,
+so an admin save can still overwrite an API write; the other direction is
+covered.
+
+## The service layer
+
+The endpoints are thin: under them is a Python service layer of functions
+taking a user and wire data (`read(user, resource, pk)`, `create(user,
+resource, data, *, dry_run)`, `update(…)`, `replace_content(…)`), which do
+the form handling, permission checks, validation and logging. The ninja
+endpoints only parse the request, call one function and map its result or
+errors to a response.
+
+Two reasons: the logic is testable without HTTP, and work that spans many
+objects can run in one transaction in process. A subtree is many creates,
+and its dry run and its load should each be one `atomic()`; over HTTP that's
+many requests. Management commands (autotranslate, importers) call the
+service layer directly; remote scripts and agents use HTTP and go object by
+object. A batch endpoint (`POST /batch/`, several operations in one
+transaction) would close that gap over HTTP; later, if it's needed.
+
+## Pages
+
+- **Creating** needs `parent` (a page or `null` for a root), `title`,
+  `page_type`/`template_key`, `language_code`; `slug` defaults to
+  `slugify(title)`. `path` is computed by `AbstractPage.save()`, never
+  written, except as `static_path` with `path` where the admin allows it.
+- **Position** among siblings is `position` as in feincms3; `move` with
+  `parent` and `position` saves through the form too, so descendants' paths
+  are updated by feincms3 as in the admin.
+- **Page types** come from `TYPES`; the schema lists each with its regions.
+  Application types are created like any page; `PageTypeMixin`'s clean
+  refuses a second instance of an app namespace, as in the admin.
+- **Deleting** a page with children is refused (`409`, listing them);
+  delete bottom-up, or not at all.
+- **New pages are inactive** unless `is_active` is given. Pages edited
+  through the API stay as they are, see "Drafts".
+- **feincms3-sites / feincms3-language-sites**: `site` is a field like any
+  other where the model has it; `find` takes `host=`. Path uniqueness is the
+  models' business. Tested in step 4, not before.
+
+## Files (django-cabinet)
+
+- `POST /files/` is `multipart/form-data`: `file`, `folder`, plus
+  `image_alt_text`, `caption` and whatever else the cabinet admin form has.
+  Images and downloads are told apart by cabinet as in the admin.
+- `PATCH /files/{id}/` changes metadata; a new `file` replaces the file under
+  the same id where the model has cabinet's `OverwriteMixin`.
+- `DELETE /files/{id}/` of a file still in use returns `409` with the
+  referencing objects (cabinet foreign keys are `PROTECT`).
+- `GET /files/?unused=true` lists files no registered model refers to, the
+  report people ask for anyway.
+- Folders: a tree of `parent` and `name`; deleting a non-empty folder is
+  refused.
+
+Uploads go to cabinet only. A plugin field takes a file reference, never a
+file.
+
+## Drafts, revisions, publishing
+
+feincms3 has no drafts or revisions, and the API doesn't add them. What a
+site has instead:
+
+- **inactive objects**: create new pages and articles inactive, review in
+  the admin, activate (or `PATCH {"is_active": true}`),
+- **dry runs** for every change to something live,
+- **the ETag** against overwriting an editor's work.
+
+Editing an active page through the API changes the live page. Revisions
+(django-reversion, or a JSON snapshot of the wire format before each write)
+are a possible later addition: the wire format would make a good revision
+format. Not v1.
+
+## Authentication and permissions
+
+- **Bearer tokens** for scripts and agents, **session** for the docs page
+  and for calls from the admin. Tokens first, since session auth fails
+  without a CSRF token.
+- A token belongs to a user and acts with that user's admin permissions,
+  never more. Tokens are read-only or read-write, expire, and are stored
+  hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.
+- Only staff users (`is_staff`) can use the API at all, since every
+  permission check goes through the admin.
+- Who changed what: `LogEntry` rows as the admin writes them
+  (`log_addition`, `log_change`, `log_deletion`), with "via API" in the
+  change message, so the admin's history shows API changes.
+
+## Settings
+
+```python
+FEINCMS3_API = {
+    "EXCLUDE_FIELDS": [
+        "forms.configuredform.recipient_email",
+        "pages.jsonplugin_key_figures.data.internal_note",
+    ],
+    "READONLY_FIELDS": [],  # beyond the admin's readonly_fields
+    "MAX_PAGE_SIZE": 200,
+}
+```
+
+Entries use the path notation; one naming a model, field or path that
+doesn't exist is a system check error, so a typo can't quietly expose a
+field.
+
+## Translating
+
+autotranslate (`feincms3_api.incubator.autotranslate`, docs in
+`docs/autotranslate.md`) copies content into another language: it dumps
+with feincms3-data, translates the strings with a file-based workflow or the
+Claude API, and loads the copies as inactive objects with its own loader. It
+stays in the incubator as it is for now.
+
+**The goal: autotranslate acts through the API.** Reading the source in the
+API's wire format instead of a feincms3-data dump, and creating the copies
+through the service layer instead of its own loader, so translated copies
+get the admin's validation, permissions and `LogEntry` like any other
+change. What stays autotranslate's own: choosing the strings (from the
+kinds), calling the translator, the glossary, the review file, mapping
+references to their counterparts. What goes: the dump format,
+`translated.json`, most of `loader.py` (save order, `full_clean()`, the
+per-model rewriting).
+
+Over HTTP, translating is smaller still, e.g. as an agent skill: read the
+source page, translate the strings the schema marks `text` and `html`, keep
+`machine`, map `link`s and references through `translation_of` and
+`pages/find/`, then `POST` the copy inactive with `translation_of` set,
+`dry_run=true` first. Page by page, reviewed in the admin. The API needs
+nothing translation-specific for it beyond the `translation_of` filter and
+the kinds.
+
+## Layout
+
+- `feincms3_api/`: the package. The introspection moves here from
+  autotranslate step by step: `fields.py` (kinds, schema walking, path
+  notation, `iter_path`), `datasets.specs_for_plugins` (plugin discovery),
+  `links.py` (first-party URLs), the path scope of the three page shapes.
+- `feincms3_api/incubator/autotranslate/`: the rest of autotranslate, its
+  own app (label `feincms3_autotranslate`), the `[anthropic]` extra, the
+  `FEINCMS3_AUTOTRANSLATE` setting.
+- `specs/`: this file.
+
+**Incubator** means: in the repository and tested, not documented as part
+of the package, no stability promise, may be removed. Its tests stay, since
+its test app is a good base for the API's own. It either graduates (rebuilt
+on the service layer) or goes away in favour of a skill.
+
+Nothing imports from a project; the test app has feincms3 pages, JSON
+plugins and cabinet.
+
+## Order of work
+
+0. The repository: autotranslate moved into the incubator, setup, credits.
+   Done.
+1. Read side: resources, codecs on top of the core, default and JSON
+   adapters, `/schema/` with the kinds, `GET` list and detail, the
+   snapshot command. Tried against a real site's content with read-only
+   tokens: already useful for reports and agents.
+2. Writes, the service layer first and endpoints around it: object
+   `PATCH`/`POST`, content `PUT`, plugin `PATCH`, dry run, ETags,
+   `LogEntry`, error paths.
+3. Pages (tree, move, find, translations filter) and cabinet (uploads,
+   folders, unused files).
+4. feincms3-sites and feincms3-language-sites test apps.
+5. First alpha; a second project; autotranslate on the service layer
+   (graduating from the incubator), a translating skill over HTTP.
+6. Later, maybe: a CLI or MCP server on top (as Wagtail did with
+   `wagtail-cli`, `wagtail-mcp`); Markdown for rich text; revisions.
+
+## Out of scope and rejected alternatives
+
+- **Public, anonymous delivery (headless).** feincms3 sites render
+  server-side; a delivery API has other concerns (caching, rendering
+  plugins to HTML, published-only). Possible later on the same codecs.
+- **Drafts, revisions, workflows.** See "Drafts".
+- **Uploading files into plugin fields** (feincms3's `Image` plugin has its
+  own `ImageField`): multipart per plugin inside a JSON content document is
+  awkward. Cabinet references instead; the plugin is read-only for now.
+- **Rich text as Markdown.** HTML is what's stored and what the
+  prose-editor field validates. Markdown in and out, as Wagtail offers, can
+  come later as `?rich_text_format=markdown`, converted on the server.
+- **Copy and translate endpoints** (Wagtail has `copy_for_translation`).
+  Translating is built on plain reads and creates, see "Translating".
+- **Generic CRUD for any model.** Only registered resources.
+- **JSON Patch, GraphQL.** Region replacement and the plugin `PATCH` cover
+  the edits; GraphQL buys nothing for writes.
+
+## Open questions
+
+- Name: `feincms3-api`, `feincms3-content-api`, or something not tied to
+  feincms3 (django-content-editor and django-cabinet work without it)?
+- Token model in the package (convenient for every site) or each project's
+  own auth classes?
+- Nested `children` for containers, as proposed, or flat with `depth` like
+  the database?
+- Should list filters come from the admin's `list_filter`, or be declared on
+  the resource? `list_filter` entries can be arbitrary `SimpleListFilter`s.
+- Where the first use comes from: an importer for a relaunch would test
+  writes much harder than a site that's already built.
+
+## Credits
+
+Moritz Wettstein started feincms3-autotranslate together with Matthias
+Kestenholz in October 2026; its introspection is this package's core.
+
+## Sources
+
+- [Wagtail 8.0 announcement: CMS with AI, not AI CMS](https://wagtail.org/blog/cms-with-ai-not-ai-cms-wagtail-80s-new-api/)
+- [Wagtail v3 API reference](https://docs.wagtail.org/en/latest/advanced_topics/api/v3/reference.html)

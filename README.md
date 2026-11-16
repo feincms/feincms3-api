@@ -10,7 +10,8 @@ data and [django-cabinet](https://github.com/matthiask/django-cabinet) files.
 For scripts, importers and agents, next to the Django admin, not instead of
 it.
 
-**Status:** early development, nothing to use yet.
+**Status:** early development, nothing to use yet. The plan is in
+[specs/api.md](specs/api.md).
 
 ## Incubator
 

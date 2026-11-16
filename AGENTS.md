@@ -13,6 +13,8 @@
 
 ## Layout
 
+- `specs/api.md`: the spec. Read it before working on the API, and keep it
+  up to date when decisions change.
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
 - `feincms3_api/incubator/`: code which may become part of the package or go
   away; tested, not documented as part of the package, no stability promise.
@@ -21,7 +23,8 @@
 
 ## Conventions
 
-- Formatting and linting: `ruff` and `pyproject-fmt` via `pre-commit`.
+- Formatting and linting: `ruff` and `pyproject-fmt` via `prek`
+  (`prek install` once per checkout, `prek run --all-files`).
 - Add user-facing changes to the "Next version" section of `CHANGELOG.md`.
 
 ## Commits
@@ -31,5 +34,8 @@
 - No AI attribution lines. Commits which move or rework code from
   feincms3-autotranslate credit its author with
   `Co-authored-by: Moritz Wettstein <mw@feinheit.ch>`.
+- Push in batches: commit locally as you go, push to `origin`
+  (github.com/feincms/feincms3-api) after a batch of related commits, not
+  after every commit, and always with the tests passing.
 - Keep commit messages short and don't repeat what the diff or changelog
   already says; a concise subject line is usually enough.
