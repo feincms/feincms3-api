@@ -93,6 +93,22 @@ class OpenAPITest(WriteTestCase):
             f"{SCHEMAS}TestappSession",
         )
 
+    def test_batch_operations(self):
+        schemas = self.openapi()["components"]["schemas"]
+
+        def ops(name):
+            return [
+                operation["properties"]["op"]["const"]
+                for operation in schemas[f"{name}BatchOperation"]["oneOf"]
+            ]
+
+        self.assertEqual(
+            ops("TestappPage"),
+            ["create", "update", "delete", "replace_content", "update_plugin"],
+        )
+        # No plugins: no operations for them
+        self.assertEqual(ops("TestappPerson"), ["create", "update", "delete"])
+
     def test_superset(self):
         # Types a user can't see are in the OpenAPI schema all the same
         user = User.objects.create_user("staff", "", "staff", is_staff=True)

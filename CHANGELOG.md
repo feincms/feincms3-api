@@ -6,6 +6,8 @@
   ignored instead of failing with 412; a field called `ref` isn't taken for
   a reference; operations of the wrong shape (an `op`, `ref` or `resource`
   which isn't a string) are a 422, not a 500.
+- The OpenAPI schema offers `replace_content` and `update_plugin` batch
+  operations only for resources with plugins.
 - Added an integration guide, `docs/integration.md`.
 
 ## 0.1 (2026-11-17)

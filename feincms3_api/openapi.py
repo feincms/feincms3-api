@@ -242,7 +242,9 @@ class Components:
             "type": "object",
             "description": 'Run in order, in one transaction. `{"ref": name}`'
             " stands for the id of an object created earlier in the batch,"
-            " wherever an id goes (also in `fields`).",
+            " wherever an id goes. The schemas of `fields` and `content` are"
+            ' those of single writes, which don\'t list `{"ref": name}` for'
+            " references inside them; the server takes it there too.",
             "properties": {
                 "operations": {
                     "type": "array",
@@ -390,17 +392,20 @@ class Components:
                     "additionalProperties": False,
                 }
 
-            return {
-                "oneOf": [
-                    operation(
-                        "create",
-                        {
-                            "resource": target["resource"],
-                            "ref": {"type": "string"},
-                            **body(ref),
-                        },
-                    ),
-                    operation("update", target | body(ref), ["id"]),
+            operations = [
+                operation(
+                    "create",
+                    {
+                        "resource": target["resource"],
+                        "ref": {"type": "string"},
+                        **body(ref),
+                    },
+                ),
+                operation("update", target | body(ref), ["id"]),
+                operation("delete", target, ["id"]),
+            ]
+            if plugins:
+                operations += [
                     operation(
                         "replace_content",
                         target | {"content": ref(f"{name}Content")},
@@ -422,9 +427,8 @@ class Components:
                         },
                         ["id", "plugin", "fields"],
                     ),
-                    operation("delete", target, ["id"]),
                 ]
-            }
+            return {"oneOf": operations}
 
         builders[f"{name}BatchOperation"] = batch_operation
         builders[name] = lambda ref: {
