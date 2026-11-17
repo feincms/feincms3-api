@@ -56,7 +56,7 @@ Mount it as its own `NinjaAPI`, with the interactive docs at `…/docs`:
 
 ```python
 # app/urls.py
-path("api/content/", content_api.as_api().urls),
+(path("api/content/", content_api.as_api().urls),)
 ```
 
 Or, if the project has a `NinjaAPI` already, as a router in it. The router

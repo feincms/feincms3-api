@@ -7,7 +7,14 @@ Sites (URL and token) and the ETags of what was read
 
 import json
 import os
+import sys
 from pathlib import Path
+
+
+def prog():
+    """The command's name as run: ``f3api``, or ``feincms3-api-cli`` (uvx)"""
+    name = Path(sys.argv[0]).name
+    return name if name in {"f3api", "feincms3-api-cli"} else "f3api"
 
 
 def _dir(env, xdg, default):
@@ -73,7 +80,7 @@ class Sites:
         name = name or os.environ.get("F3API_SITE") or self.data.get("default")
         if not name or name not in self.data["sites"]:
             raise LookupError(
-                "No site: add one with `f3api site add NAME URL`, or set"
+                f"No site: add one with `{prog()} site add NAME URL`, or set"
                 " F3API_URL and F3API_TOKEN."
             )
         site = self.data["sites"][name]

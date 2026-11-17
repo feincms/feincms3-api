@@ -25,7 +25,7 @@
   regenerate it with `.venv/bin/python tests/manage.py f3api_schema
   testapp.content_api.content_api > tests/testapp/snapshot.txt` and look at
   the diff.
-- `cli/`: `feincms3-api-cli` (command `f3api`), a separate package with its
+- `cli/`: `feincms3-api-cli` (command `f3api`, also `feincms3-api-cli` for `uvx`), a separate package with its
   own `pyproject.toml`, standard library only, talking HTTP. Its tests are
   `tests/testapp/test_cli.py` (against the live test server), so they run
   with the package's.

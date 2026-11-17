@@ -3,7 +3,8 @@
 ## Next version
 
 - The command is also installed as `feincms3-api-cli`, so
-  `uvx feincms3-api-cli` works.
+  `uvx feincms3-api-cli` works. Usage and messages use the name it was run
+  as.
 
 ## 0.0.1 (2026-11-17)
 

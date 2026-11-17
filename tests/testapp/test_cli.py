@@ -1,14 +1,16 @@
 import contextlib
+import importlib
 import io
 import json
 import os
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import LiveServerTestCase, override_settings
+from django.test import LiveServerTestCase, SimpleTestCase, override_settings
 
 from feincms3_api.models import APIToken
 from testapp.models import Button, Page
@@ -16,7 +18,11 @@ from testapp.models import Button, Page
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cli"))
 
+from feincms3_api_cli.config import prog
 from feincms3_api_cli.main import main
+
+
+CLI = Path(__file__).resolve().parents[2] / "cli"
 
 
 class CLITest(LiveServerTestCase):
@@ -184,3 +190,23 @@ class CLITest(LiveServerTestCase):
             with mock.patch.dict(os.environ, {"F3API_TOKEN": ""}):
                 code, data, err = self.run_cli("list", "pages")
             self.assertEqual(code, 0, err)
+
+
+class ScriptsTest(SimpleTestCase):
+    def test_scripts(self):
+        scripts = tomllib.loads((CLI / "pyproject.toml").read_text())["project"][
+            "scripts"
+        ]
+        self.assertEqual(set(scripts), {"f3api", "feincms3-api-cli"})
+        for target in scripts.values():
+            module, _sep, name = target.partition(":")
+            self.assertTrue(callable(getattr(importlib.import_module(module), name)))
+
+    def test_prog(self):
+        for argv0, expected in [
+            ("/home/x/.local/bin/f3api", "f3api"),
+            ("/tmp/uv/bin/feincms3-api-cli", "feincms3-api-cli"),
+            ("manage.py", "f3api"),
+        ]:
+            with mock.patch.object(sys, "argv", [argv0]):
+                self.assertEqual(prog(), expected)

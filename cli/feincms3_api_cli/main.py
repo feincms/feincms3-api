@@ -13,7 +13,7 @@ import json
 import sys
 
 from feincms3_api_cli.client import APIError, Client
-from feincms3_api_cli.config import ETags, Sites
+from feincms3_api_cli.config import ETags, Sites, prog
 
 
 # Exit codes
@@ -47,14 +47,14 @@ def main(argv=None):
         print_error(exc)
         return STATUS_EXIT.get(exc.status, FAILED)
     except CommandError as exc:
-        print(f"f3api: {exc}", file=sys.stderr)
+        print(f"{prog()}: {exc}", file=sys.stderr)
         return exc.code
 
 
 def print_error(exc):
     data = exc.data if isinstance(exc.data, dict) else {"detail": exc.data}
     prefix = f"operation {data['operation']}: " if "operation" in data else ""
-    print(f"f3api: {exc.status} {prefix}{data.get('detail', '')}", file=sys.stderr)
+    print(f"{prog()}: {exc.status} {prefix}{data.get('detail', '')}", file=sys.stderr)
     for error in data.get("errors") or ():
         if isinstance(error, dict):
             path = error.get("path") or error.get("loc") or ""
@@ -212,7 +212,7 @@ def plugin(args):
 def _written(args, data):
     if not args.apply:
         print(
-            "f3api: dry run, nothing saved; run again with --apply to save.",
+            f"{prog()}: dry run, nothing saved; run again with --apply to save.",
             file=sys.stderr,
         )
     output(data)
@@ -226,7 +226,7 @@ def _if_match(args, etags, resource, pk):
     if etag := etags.get(resource, pk):
         return etag
     raise CommandError(
-        f"No ETag for {resource}/{pk}: read it first (f3api get {resource} {pk}),"
+        f"No ETag for {resource}/{pk}: read it first ({prog()} get {resource} {pk}),"
         " or pass --etag or --force.",
         CONFLICT,
     )
@@ -304,10 +304,10 @@ def delete(args):
     )
     if args.apply:
         etags.update({(args.resource, args.id): None})
-        print(f"f3api: deleted {args.resource}/{args.id}.", file=sys.stderr)
+        print(f"{prog()}: deleted {args.resource}/{args.id}.", file=sys.stderr)
     else:
         print(
-            f"f3api: dry run, {args.resource}/{args.id} can be deleted; run"
+            f"{prog()}: dry run, {args.resource}/{args.id} can be deleted; run"
             " again with --apply to delete it.",
             file=sys.stderr,
         )
@@ -364,7 +364,7 @@ def batch(args):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="f3api",
+        prog=prog(),
         description="The feincms3 content API from the command line.",
         epilog="Exit codes: 0 done, 1 failed, 2 usage, 3 invalid data (with"
         " paths), 4 conflict (ETag, references), 5 not found, 6 not allowed.",
