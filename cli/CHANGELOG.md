@@ -16,6 +16,8 @@
   broken, missing or badly written.
 - An error answer which isn't JSON (a site's HTML 404 page) is shown as
   its status, reason and URL, not as its HTML.
+- Error answers are closed, no `ResourceWarning` on Python 3.14 and
+  later.
 
 ## 0.2 (2026-11-17)
 
