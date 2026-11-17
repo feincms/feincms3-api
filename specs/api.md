@@ -362,6 +362,7 @@ not the verbose name, which changes with the language):
 | `GET /{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
 | `PATCH /{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
 | `DELETE /{resource}/{id}/` | delete |
+| `DELETE /{resource}/{id}/cache/` | delete the cached rendering, see below |
 | `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
@@ -438,12 +439,22 @@ fields, content and inlines in wire format. Every `PATCH`, `PUT` and `DELETE` ne
 so an admin save can still overwrite an API write; the other direction is
 covered.
 
+**Cached rendering.** Sites often cache rendered regions
+(`regions_from_item(..., timeout=60)`), so a client checking its edit on
+the site would have to wait for the timeout. `DELETE …/cache/` deletes the
+object's cache keys (`Resource.cache_keys()`, by default
+django-content-editor's `regions-{type}-{id}`), with the permission to
+change the object. It's explicit, not done on every write: only a client
+looking at the result needs it. A site with its own `cache_key=` overrides
+`cache_keys()`; pages inheriting regions from their ancestors keep the
+ancestors' old content until their own keys are deleted too.
+
 ## Operations without HTTP
 
 The endpoints are thin: under them are the operations, methods of
 `ContentAPI` taking a request (the admin's methods need one) and wire data
 (`list()`, `detail()`, `create()`, `update()`, `replace_content()`,
-`update_plugin()`, `delete()`), which do the form handling, permission
+`update_plugin()`, `delete()`, `clear_cache()`), which do the form handling, permission
 checks, validation and logging. The ninja endpoints only parse the request,
 call one operation and map its result or errors to a response.
 

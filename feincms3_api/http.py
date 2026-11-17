@@ -175,6 +175,13 @@ def _add_routes(api, router, resource):
         )
         return HttpResponse(status=204)
 
+    @router.delete(f"{name}/{{pk}}/cache/", operation_id=f"{operation}_cache_clear")
+    @_errors
+    def clear_cache(request, pk: str):
+        """Delete the cached rendering, to see changes on the site at once"""
+        api.clear_cache(request, name, pk)
+        return HttpResponse(status=204)
+
 
 def _json(wire, status=200):
     response = JsonResponse(wire, status=status)

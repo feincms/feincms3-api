@@ -493,6 +493,14 @@ class Resource:
         """
         return []
 
+    def cache_keys(self, request, obj):
+        """
+        The cache keys of ``obj``'s rendered content, which
+        ``DELETE …/cache/`` deletes: django-content-editor's default for
+        ``regions_from_item(..., timeout=...)``
+        """
+        return [f"regions-{obj._meta.label_lower}-{obj.pk}"]
+
     #: Whether objects can be found by their path (``find/?path=``)
     findable = False
 

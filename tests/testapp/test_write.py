@@ -2,6 +2,7 @@ import json
 
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import Permission, User
+from django.core.cache import cache
 
 from testapp.models import Accordion, Article, Contact, Page, Person, RichText
 from testapp.test_api import APITestCase
@@ -385,3 +386,24 @@ class DeleteTest(WriteTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["protected"][0]["type"], "testapp.contact")
         self.assertTrue(Person.objects.filter(pk=person.pk).exists())
+
+
+class CacheTest(WriteTestCase):
+    def test_clear_cache(self):
+        key = f"regions-testapp.page-{self.angebot.pk}"
+        cache.set(key, "rendered")
+        response = self.send("delete", f"pages/{self.angebot.pk}/cache/")
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(cache.get(key))
+
+        cache.set(key, "rendered")
+        user = User.objects.create_user("staff", "", "staff", is_staff=True)
+        user.user_permissions.add(
+            Permission.objects.get(
+                codename="view_page", content_type__app_label="testapp"
+            )
+        )
+        self.client.force_login(user)
+        response = self.send("delete", f"pages/{self.angebot.pk}/cache/")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(cache.get(key), "rendered")

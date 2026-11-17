@@ -20,7 +20,7 @@ errors, ETags, dry runs, tokens and uploads.
 ```
 HTTP ──▶ http.py ──▶ ContentAPI (api.py)
           ninja       ├─ reading.py   list, detail, find, plugin
-          routes      ├─ writing.py   create, update, update_plugin, delete, upload
+          routes      ├─ writing.py   create, update, update_plugin, delete, clear_cache, upload
                       └─ schema.py    /schema/, /schema/{type}/
                               │
                               ▼
@@ -68,7 +68,8 @@ feincms3-language-sites), `FileResource` and `FolderResource`
 (django-cabinet), `ConfiguredFormResource` (feincms3-forms validation as
 warnings). Hooks for projects: `describe()` (what a reference to an object
 shows), `check()` (problems which don't stop saving, in `meta.warnings`),
-`validate_instance()`, `check_delete()`, `find()`, `filters=`.
+`validate_instance()`, `check_delete()`, `cache_keys()` (what
+`DELETE …/cache/` deletes), `find()`, `filters=`.
 
 **Adapters** (`adapters.py`) decide what an object's or a plugin's `fields`
 are. The default `FormAdapter` takes the admin form's fields and runs each

@@ -8,6 +8,7 @@ dry run, and is logged in the admin's history.
 
 import os
 
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
@@ -231,6 +232,12 @@ class WritingMixin:
                 raise _protected(exc) from exc
             if dry_run:
                 transaction.set_rollback(True)
+
+    def clear_cache(self, request, name, pk):
+        """Delete the cached rendering of an object (``Resource.cache_keys()``)"""
+        resource, obj = self._get(request, name, pk)
+        self._check_change(request, resource, obj)
+        cache.delete_many(resource.cache_keys(request, obj))
 
 
 def _protected(exc):

@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Added `DELETE /{resource}/{id}/cache/` (`ContentAPI.clear_cache()`) to
+  delete an object's cached rendering, so a client can check its changes on
+  the site at once; `Resource.cache_keys()` says which keys.
 - The plugin `PATCH` returns the object's `meta.warnings` and `etag` in the
   plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
 - A system check (`feincms3_api.E003`) reports a registered model's admin
