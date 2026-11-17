@@ -138,8 +138,8 @@ checks for resources without an admin and for `EXCLUDE_FIELDS` and
 fields and their kinds, for a snapshot test), `f3api_token`,
 `f3api_cleanup` (expired uploads and tokens).
 
-**The CLI** (`cli/`, its own package): `f3api` (also installed as `feincms3-api-cli`, for `uvx`) talks HTTP with a token,
-standard library only. Writes are dry runs unless `--apply`; it remembers
+**The CLI** (`cli/`, its own package): `f3api` (also installed as `feincms3-api-cli`, for `uvx`) talks HTTP with a token
+(click for the commands, rich for tables and errors). Writes are dry runs unless `--apply`; it remembers
 the ETag of each object it read (`~/.cache/f3api/etags.json`) and sends
 that one, so a write fails rather than overwrite a change made since.
 

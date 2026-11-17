@@ -3,7 +3,6 @@
 The [feincms3 content API](https://github.com/feincms/feincms3-api) from the
 command line, for people and for agents with a shell. It talks HTTP with a
 token, so it works against any site with the API, without the site's code.
-Standard library only.
 
 ```bash
 uvx feincms3-api-cli --help        # or: uv tool install feincms3-api-cli
@@ -29,7 +28,9 @@ f3api --site other list pages                     # the first site is the defaul
 
 ## Reading
 
-Everything prints JSON:
+Reads print JSON. `site list`, `resources` and `list` print tables in a
+terminal, and JSON with `--json` or when the output goes to a pipe or a
+file (scripts, agents):
 
 ```bash
 f3api resources

@@ -35,6 +35,7 @@ dependencies = [
   "feincms3>=7.1",
 ]
 optional-dependencies.tests = [
+  "click>=8.1",
   "coverage",
   "django-cabinet",
   "django-json-schema-editor",
@@ -44,6 +45,7 @@ optional-dependencies.tests = [
   "feincms3-language-sites",
   "feincms3-sites>=0.23",
   "openapi-spec-validator",
+  "rich>=13",
 ]
 urls.Homepage = "https://github.com/feincms/feincms3-api/"
 

@@ -25,6 +25,11 @@ from feincms3_api_cli.main import main
 CLI = Path(__file__).resolve().parents[2] / "cli"
 
 
+class Terminal(io.StringIO):
+    def isatty(self):
+        return True
+
+
 class CLITest(LiveServerTestCase):
     def setUp(self):
         user = User.objects.create_superuser("admin", "", "admin")
@@ -58,8 +63,8 @@ class CLITest(LiveServerTestCase):
         env.start()
         self.addCleanup(env.stop)
 
-    def run_cli(self, *args, stdin=""):
-        stdout, stderr = io.StringIO(), io.StringIO()
+    def run_cli(self, *args, stdin="", tty=False):
+        stdout, stderr = (Terminal() if tty else io.StringIO()), io.StringIO()
         with (
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
@@ -67,6 +72,8 @@ class CLITest(LiveServerTestCase):
         ):
             code = main([str(arg) for arg in args])
         out = stdout.getvalue()
+        if tty:
+            return code, out, stderr.getvalue()
         return code, json.loads(out) if out.strip() else None, stderr.getvalue()
 
     def test_read(self):
@@ -80,6 +87,26 @@ class CLITest(LiveServerTestCase):
         code, data, err = self.run_cli("get", "pages", 0)
         self.assertEqual(code, 5)
         self.assertIn("404", err)
+
+    def test_tables(self):
+        code, out, err = self.run_cli("list", "pages", tty=True)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Startseite", out)
+        self.assertIn("/de/", out)
+        self.assertIn("1–1 of 1", out)
+        code, out, _err = self.run_cli("resources", tty=True)
+        self.assertIn("testapp.page", out)
+        # JSON when asked for
+        code, out, _err = self.run_cli("list", "pages", "--json", tty=True)
+        self.assertEqual(json.loads(out)["count"], 1)
+
+    def test_usage(self):
+        code, _data, err = self.run_cli("get", "pages")
+        self.assertEqual(code, 2)
+        self.assertIn("Missing argument", err)
+        code, out, _err = self.run_cli("--help", tty=True)
+        self.assertEqual(code, 0)
+        self.assertIn("Exit codes", out)
 
     def test_update_with_etags(self):
         page = f"{self.home.pk}"

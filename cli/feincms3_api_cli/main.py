@@ -1,17 +1,24 @@
 """
 The feincms3 content API from the command line (``f3api``)
 
-Reads print JSON. Writes are dry runs unless ``--apply`` is given, and send
-the ETag of the object as it was last read with this tool (``get``,
-``list``, ``find``), so they fail instead of overwriting someone else's
-change. Errors are printed with their paths.
+Reads print JSON; ``site list``, ``resources`` and ``list`` print tables
+in a terminal (JSON with ``--json``, or when the output isn't a terminal).
+Writes are dry runs unless ``--apply`` is given, and send the ETag of the
+object as it was last read with this tool (``get``, ``list``, ``find``), so
+they fail instead of overwriting someone else's change. Errors are printed
+with their paths.
 """
 
-import argparse
 import getpass
 import json
 import os
 import sys
+
+import click
+from rich import box
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
 from feincms3_api_cli.client import APIError, Client, TransportError
 from feincms3_api_cli.config import ETags, Sites, prog
@@ -29,6 +36,11 @@ STATUS_EXIT = {
     403: FORBIDDEN,
 }
 
+# Both write to sys.stdout and sys.stderr as they are when printing.
+# Messages aren't wrapped, so they can be searched for.
+console = Console(markup=False, highlight=False)
+errors = Console(stderr=True, markup=False, highlight=False, soft_wrap=True)
+
 
 class CommandError(Exception):
     def __init__(self, message, code=FAILED):
@@ -37,41 +49,71 @@ class CommandError(Exception):
 
 
 def main(argv=None):
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    if not getattr(args, "handler", None):
-        parser.print_help()
-        return USAGE
     try:
-        return args.handler(args) or OK
+        return cli.main(argv, prog_name=prog(), standalone_mode=False) or OK
+    except click.ClickException as exc:
+        exc.show()
+        return exc.exit_code
+    except click.Abort:
+        errors.print("Aborted.")
+        return FAILED
     except APIError as exc:
         print_error(exc)
         return STATUS_EXIT.get(exc.status, FAILED)
-    except CommandError as exc:
-        print(f"{prog()}: {exc}", file=sys.stderr)
-        return exc.code
-    except TransportError as exc:
-        print(f"{prog()}: {exc}", file=sys.stderr)
-        return FAILED
+    except (CommandError, TransportError) as exc:
+        message(str(exc))
+        return getattr(exc, "code", FAILED)
+
+
+def message(text):
+    errors.print(f"{prog()}: {text}")
 
 
 def print_error(exc):
     data = exc.data if isinstance(exc.data, dict) else {"detail": exc.data}
     prefix = f"operation {data['operation']}: " if "operation" in data else ""
-    print(f"{prog()}: {exc.status} {prefix}{data.get('detail', '')}", file=sys.stderr)
+    errors.print(
+        Text.assemble(
+            f"{prog()}: ", (f"{exc.status}", "bold red"), f" {prefix}"
+        ).append(str(data.get("detail", "")))
+    )
     for error in data.get("errors") or ():
         if isinstance(error, dict):
             path = error.get("path") or error.get("loc") or ""
-            message = error.get("message") or error.get("msg") or ""
-            print(f"  {path}: {message}", file=sys.stderr)
+            text = error.get("message") or error.get("msg") or ""
+            errors.print(Text.assemble("  ", (str(path), "bold"), f": {text}"))
     for key, value in data.items():
         if key not in {"detail", "errors", "operation"}:
-            print(f"  {key}: {json.dumps(value)}", file=sys.stderr)
+            errors.print(Text.assemble("  ", (key, "bold"), f": {json.dumps(value)}"))
 
 
 def output(data):
     json.dump(data, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
+
+
+def wants_json(as_json):
+    """JSON when asked for, and for scripts and agents"""
+    return as_json or not sys.stdout.isatty()
+
+
+def table(*columns):
+    """Columns ending in ">" are right-aligned"""
+    result = Table(box=box.SIMPLE_HEAD)
+    for column in columns:
+        if column.endswith(">"):
+            result.add_column(column[:-1], justify="right", no_wrap=True)
+        else:
+            result.add_column(column)
+    return result
+
+
+def cell(value):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
 
 
 def read_json(path):
@@ -86,9 +128,10 @@ def read_json(path):
         ) from exc
 
 
-def connect(args):
+def connect():
+    site = click.get_current_context().find_root().params.get("site")
     try:
-        url, token = Sites().resolve(args.site)
+        url, token = Sites().resolve(site)
     except LookupError as exc:
         raise CommandError(str(exc), USAGE) from exc
     return Client(url, token), ETags(url)
@@ -98,78 +141,156 @@ def _etag(wire):
     return (wire or {}).get("meta", {}).get("etag")
 
 
+json_option = click.option(
+    "--json", "as_json", is_flag=True, help="JSON, also when printing to a terminal"
+)
+
+
+@click.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    epilog="Exit codes: 0 done, 1 failed, 2 usage, 3 invalid data (with"
+    " paths), 4 conflict (ETag, references), 5 not found, 6 not allowed.",
+)
+@click.option("--site", help="A site added with `site add`.")
+def cli(site):
+    """The feincms3 content API from the command line."""
+
+
 # Sites ######################################################################
 
 
-def site_add(args):
-    token = (
-        sys.stdin.readline().strip() if args.token_stdin else getpass.getpass("Token: ")
-    )
-    Sites().add(args.name, args.url, token)
+@cli.group()
+def site():
+    """The sites and their tokens."""
 
 
-def site_list(args):
+@site.command("add")
+@click.argument("name")
+@click.argument("url")
+@click.option("--token-stdin", is_flag=True, help="Read the token from stdin.")
+def site_add(name, url, token_stdin):
+    """Add a site; asks for the token. URL is where the API is, e.g.
+    https://example.com/api/"""
+    token = sys.stdin.readline().strip() if token_stdin else getpass.getpass("Token: ")
+    Sites().add(name, url, token)
+
+
+@site.command("list")
+@json_option
+def site_list(as_json):
+    """The sites."""
     data = Sites().data
-    output(
-        {
-            name: {"url": site["url"], "default": name == data.get("default")}
-            for name, site in data["sites"].items()
-        }
-    )
+    sites = {
+        name: {"url": site["url"], "default": name == data.get("default")}
+        for name, site in data["sites"].items()
+    }
+    if wants_json(as_json):
+        output(sites)
+        return
+    rows = table("Site", "URL", "Default")
+    for name, site in sites.items():
+        rows.add_row(name, site["url"], "yes" if site["default"] else "")
+    console.print(rows)
 
 
-def site_remove(args):
+@site.command("remove")
+@click.argument("name")
+def site_remove(name):
+    """Remove a site."""
     try:
-        Sites().remove(args.name)
+        Sites().remove(name)
     except KeyError as exc:
-        raise CommandError(f"No site {args.name!r}.", USAGE) from exc
+        raise CommandError(f"No site {name!r}.", USAGE) from exc
 
 
-def site_default(args):
+@site.command("default")
+@click.argument("name")
+def site_default(name):
+    """Use a site by default."""
     try:
-        Sites().set_default(args.name)
+        Sites().set_default(name)
     except KeyError as exc:
-        raise CommandError(f"No site {args.name!r}.", USAGE) from exc
+        raise CommandError(f"No site {name!r}.", USAGE) from exc
 
 
 # Reading ####################################################################
 
 
-def resources(args):
-    client, _etags = connect(args)
+@cli.command()
+@json_option
+def resources(as_json):
+    """The resources."""
+    client, _etags = connect()
     _status, data = client.request("GET", "schema/")
-    output(
-        [
-            {"name": r["name"], "type": r["type"], "title": r["title"]}
-            for r in data["resources"]
-        ]
-    )
+    items = [
+        {"name": r["name"], "type": r["type"], "title": r["title"]}
+        for r in data["resources"]
+    ]
+    if wants_json(as_json):
+        output(items)
+        return
+    rows = table("Resource", "Type", "Title")
+    for item in items:
+        rows.add_row(item["name"], item["type"], item["title"])
+    console.print(rows)
 
 
-def schema(args):
-    client, _etags = connect(args)
-    path = f"schema/{args.type}/" if args.type else "schema/"
+@cli.command()
+@click.argument("type", required=False)
+def schema(type):
+    """The regions and plugins, or one TYPE's fields (e.g. pages.page)."""
+    client, _etags = connect()
+    path = f"schema/{type}/" if type else "schema/"
     output(client.request("GET", path)[1])
 
 
-def list_objects(args):
-    client, etags = connect(args)
-    params = dict(_pair(f) for f in args.filter)
+@cli.command("list")
+@click.argument("resource")
+@click.option("-f", "--filter", "filters", multiple=True, metavar="KEY=VALUE")
+@click.option("-q", "q", help="Search.")
+@click.option("--limit", type=int)
+@click.option("--offset", type=int)
+@click.option("--fields", help="Only these fields, comma separated.")
+@click.option("--content", is_flag=True, help="With content.")
+@click.option("--expand", is_flag=True, help="Describe references.")
+@json_option
+def list_objects(resource, filters, q, limit, offset, fields, content, expand, as_json):
+    """List objects."""
+    client, etags = connect()
+    params = dict(_pair(f) for f in filters)
     params |= {
-        "limit": args.limit,
-        "offset": args.offset,
-        "q": args.q,
-        "fields": args.fields,
-        "content": "true" if args.content else None,
-        "expand": "references" if args.expand else None,
+        "limit": limit,
+        "offset": offset,
+        "q": q,
+        "fields": fields,
+        "content": "true" if content else None,
+        "expand": "references" if expand else None,
     }
-    _status, data = client.request("GET", f"{args.resource}/", params=params)
+    _status, data = client.request("GET", f"{resource}/", params=params)
     # Without content, an item's ETag isn't the object's.
-    if args.content:
-        etags.update(
-            {(args.resource, item["id"]): _etag(item) for item in data["items"]}
-        )
-    output(data)
+    if content:
+        etags.update({(resource, item["id"]): _etag(item) for item in data["items"]})
+    if wants_json(as_json):
+        output(data)
+        return
+    items = data["items"]
+    names = [name for name in (fields or "").split(",") if name]
+    with_path = not names and any("path" in item.get("meta", {}) for item in items)
+    rows = table("ID>", *(names or ["Title", *["Path"] * with_path]))
+    for item in items:
+        meta = item.get("meta", {})
+        if names:
+            values = [cell(item.get("fields", {}).get(name)) for name in names]
+        else:
+            values = [cell(meta.get("title")), *[cell(meta.get("path"))] * with_path]
+        rows.add_row(str(item["id"]), *values)
+    console.print(rows)
+    start = (offset or 0) + 1
+    console.print(
+        f"{start}–{start + len(items) - 1} of {data['count']}"
+        if items
+        else f"None of {data['count']}"
+    )
 
 
 def _pair(value):
@@ -179,54 +300,85 @@ def _pair(value):
     return key, rest
 
 
-def get(args):
-    client, etags = connect(args)
+@cli.command()
+@click.argument("resource")
+@click.argument("id")
+@click.option("--nested", is_flag=True, help="Containers with children.")
+@click.option("--expand", is_flag=True, help="Describe references.")
+def get(resource, id, nested, expand):
+    """One object."""
+    client, etags = connect()
     _status, data = client.request(
         "GET",
-        f"{args.resource}/{args.id}/",
+        f"{resource}/{id}/",
         params={
-            "nested": "true" if args.nested else None,
-            "expand": "references" if args.expand else None,
+            "nested": "true" if nested else None,
+            "expand": "references" if expand else None,
         },
     )
-    etags.update({(args.resource, data["id"]): _etag(data)})
+    etags.update({(resource, data["id"]): _etag(data)})
     output(data)
 
 
-def find(args):
-    client, etags = connect(args)
+@cli.command()
+@click.argument("path")
+@click.option("--resource", default="pages", show_default=True)
+@click.option("--host")
+def find(path, resource, host):
+    """An object by its path."""
+    client, etags = connect()
     _status, data = client.request(
-        "GET",
-        f"{args.resource}/find/",
-        params={"path": args.path, "host": args.host},
+        "GET", f"{resource}/find/", params={"path": path, "host": host}
     )
-    etags.update({(args.resource, data["id"]): _etag(data)})
+    etags.update({(resource, data["id"]): _etag(data)})
     output(data)
 
 
-def plugin(args):
-    client, _etags = connect(args)
-    path = f"{args.resource}/{args.id}/plugins/{args.type}/{args.plugin_id}/"
-    output(client.request("GET", path)[1])
+@cli.command()
+@click.argument("resource")
+@click.argument("id")
+@click.argument("type")
+@click.argument("plugin_id")
+def plugin(resource, id, type, plugin_id):
+    """One plugin of an object."""
+    client, _etags = connect()
+    output(client.request("GET", f"{resource}/{id}/plugins/{type}/{plugin_id}/")[1])
 
 
 # Writing ####################################################################
 
 
-def _written(args, data):
-    if not args.apply:
-        print(
-            f"{prog()}: dry run, nothing saved; run again with --apply to save.",
-            file=sys.stderr,
-        )
+def writing(*, etag=True):
+    def decorator(function):
+        if etag:
+            function = click.option(
+                "--force", is_flag=True, help="Overwrite whatever is there."
+            )(function)
+            function = click.option("--etag", help="Instead of the one last read.")(
+                function
+            )
+        return click.option(
+            "--apply", is_flag=True, help="Save; without it, a dry run."
+        )(function)
+
+    return decorator
+
+
+file_argument = click.argument("file", required=False)
+FILE_HELP = "FILE is JSON; stdin if left out or -."
+
+
+def _written(apply, data):
+    if not apply:
+        message("dry run, nothing saved; run again with --apply to save.")
     output(data)
 
 
-def _if_match(args, etags, resource, pk):
-    if args.force:
+def _if_match(etags, resource, pk, *, etag, force):
+    if force:
         return "*"
-    if args.etag:
-        return args.etag
+    if etag:
+        return etag
     if etag := etags.get(resource, pk):
         return etag
     raise CommandError(
@@ -236,106 +388,146 @@ def _if_match(args, etags, resource, pk):
     )
 
 
-def _params(args):
-    return {"dry_run": None if args.apply else "true"}
+def _params(apply):
+    return {"dry_run": None if apply else "true"}
 
 
-def create(args):
-    client, etags = connect(args)
+@cli.command(epilog=FILE_HELP)
+@click.argument("resource")
+@file_argument
+@writing(etag=False)
+def create(resource, file, apply):
+    """Create an object from JSON."""
+    client, etags = connect()
     _status, data = client.request(
-        "POST", f"{args.resource}/", params=_params(args), body=read_json(args.file)
+        "POST", f"{resource}/", params=_params(apply), body=read_json(file)
     )
-    if args.apply:
-        etags.update({(args.resource, data["id"]): _etag(data)})
-    _written(args, data)
+    if apply:
+        etags.update({(resource, data["id"]): _etag(data)})
+    _written(apply, data)
 
 
-def update(args):
-    client, etags = connect(args)
+@cli.command(epilog=FILE_HELP)
+@click.argument("resource")
+@click.argument("id")
+@file_argument
+@writing()
+def update(resource, id, file, apply, etag, force):
+    """Change fields, replace regions."""
+    client, etags = connect()
     _status, data = client.request(
         "PATCH",
-        f"{args.resource}/{args.id}/",
-        params=_params(args),
-        body=read_json(args.file),
-        headers={"If-Match": _if_match(args, etags, args.resource, args.id)},
+        f"{resource}/{id}/",
+        params=_params(apply),
+        body=read_json(file),
+        headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
     )
-    if args.apply:
-        etags.update({(args.resource, args.id): _etag(data)})
-    _written(args, data)
+    if apply:
+        etags.update({(resource, id): _etag(data)})
+    _written(apply, data)
 
 
-def content(args):
-    client, etags = connect(args)
-    body = read_json(args.file)
+@cli.command(epilog=FILE_HELP)
+@click.argument("resource")
+@click.argument("id")
+@file_argument
+@writing()
+def content(resource, id, file, apply, etag, force):
+    """Replace the regions given."""
+    client, etags = connect()
+    body = read_json(file)
     # The body, or only its regions (which may include one called "content")
     if not (isinstance(body, dict) and isinstance(body.get("content"), dict)):
         body = {"content": body}
     _status, data = client.request(
         "PUT",
-        f"{args.resource}/{args.id}/content/",
-        params=_params(args),
+        f"{resource}/{id}/content/",
+        params=_params(apply),
         body=body,
-        headers={"If-Match": _if_match(args, etags, args.resource, args.id)},
+        headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
     )
-    if args.apply:
-        etags.update({(args.resource, args.id): _etag(data)})
-    _written(args, data)
+    if apply:
+        etags.update({(resource, id): _etag(data)})
+    _written(apply, data)
 
 
-def update_plugin(args):
-    client, etags = connect(args)
-    body = read_json(args.file)
+@cli.command("update-plugin", epilog=FILE_HELP)
+@click.argument("resource")
+@click.argument("id")
+@click.argument("type")
+@click.argument("plugin_id")
+@file_argument
+@writing()
+def update_plugin(resource, id, type, plugin_id, file, apply, etag, force):
+    """Change one plugin's fields."""
+    client, etags = connect()
+    body = read_json(file)
     if not (isinstance(body, dict) and set(body) == {"fields"}):
         body = {"fields": body}
     _status, data = client.request(
         "PATCH",
-        f"{args.resource}/{args.id}/plugins/{args.type}/{args.plugin_id}/",
-        params=_params(args),
+        f"{resource}/{id}/plugins/{type}/{plugin_id}/",
+        params=_params(apply),
         body=body,
-        headers={"If-Match": _if_match(args, etags, args.resource, args.id)},
+        headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
     )
-    if args.apply:
-        etags.update({(args.resource, args.id): _etag(data)})
-    _written(args, data)
+    if apply:
+        etags.update({(resource, id): _etag(data)})
+    _written(apply, data)
 
 
-def delete(args):
-    client, etags = connect(args)
+@cli.command()
+@click.argument("resource")
+@click.argument("id")
+@writing()
+def delete(resource, id, apply, etag, force):
+    """Delete an object."""
+    client, etags = connect()
     client.request(
         "DELETE",
-        f"{args.resource}/{args.id}/",
-        params=_params(args),
-        headers={"If-Match": _if_match(args, etags, args.resource, args.id)},
+        f"{resource}/{id}/",
+        params=_params(apply),
+        headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
     )
-    if args.apply:
-        etags.update({(args.resource, args.id): None})
-        print(f"{prog()}: deleted {args.resource}/{args.id}.", file=sys.stderr)
+    if apply:
+        etags.update({(resource, id): None})
+        message(f"deleted {resource}/{id}.")
     else:
-        print(
-            f"{prog()}: dry run, {args.resource}/{args.id} can be deleted; run"
-            " again with --apply to delete it.",
-            file=sys.stderr,
+        message(
+            f"dry run, {resource}/{id} can be deleted; run again with --apply"
+            " to delete it."
         )
 
 
-def cache_clear(args):
-    client, _etags = connect(args)
-    client.request("DELETE", f"{args.resource}/{args.id}/cache/")
+@cli.command("cache-clear")
+@click.argument("resource")
+@click.argument("id")
+def cache_clear(resource, id):
+    """Delete an object's cached rendering."""
+    client, _etags = connect()
+    client.request("DELETE", f"{resource}/{id}/cache/")
 
 
-def upload(args):
-    client, _etags = connect(args)
+@cli.command()
+@click.argument("file")
+def upload(file):
+    """Stage a file; prints the reference to write."""
+    client, _etags = connect()
     try:
-        with open(args.file, "rb") as f:
-            content = f.read()
+        with open(file, "rb") as f:
+            data = f.read()
     except OSError as exc:
-        raise CommandError(f"Can't read {args.file}: {exc}", USAGE) from exc
-    output(client.upload(os.path.basename(args.file), content)[1])
+        raise CommandError(f"Can't read {file}: {exc}", USAGE) from exc
+    output(client.upload(os.path.basename(file), data)[1])
 
 
-def batch(args):
-    client, etags = connect(args)
-    body = read_json(args.file)
+@cli.command(epilog=FILE_HELP)
+@file_argument
+@writing(etag=False)
+def batch(file, apply):
+    """Several writes in one transaction."""
+    client, etags = connect()
+    body = read_json(file)
     if isinstance(body, list):
         body = {"operations": body}
     operations = body.get("operations") if isinstance(body, dict) else None
@@ -348,8 +540,8 @@ def batch(args):
             and (etag := etags.get(operation.get("resource"), operation.get("id")))
         ):
             operation["etag"] = etag
-    _status, data = client.request("POST", "batch/", params=_params(args), body=body)
-    if args.apply:
+    _status, data = client.request("POST", "batch/", params=_params(apply), body=body)
+    if apply:
         entries = {}
         for operation, result in zip(operations, data["results"], strict=False):
             resource = operation["resource"]
@@ -363,123 +555,7 @@ def batch(args):
                 None if operation["op"] == "delete" else _etag(result)
             )
         etags.update(entries)
-    _written(args, data)
-
-
-# The parser #################################################################
-
-
-def build_parser():
-    parser = argparse.ArgumentParser(
-        prog=prog(),
-        description="The feincms3 content API from the command line.",
-        epilog="Exit codes: 0 done, 1 failed, 2 usage, 3 invalid data (with"
-        " paths), 4 conflict (ETag, references), 5 not found, 6 not allowed.",
-    )
-    parser.add_argument("--site", help="a site added with `site add`")
-    commands = parser.add_subparsers(title="commands")
-
-    def command(name, handler, help):
-        sub = commands.add_parser(name, help=help, description=help)
-        sub.set_defaults(handler=handler)
-        return sub
-
-    site = commands.add_parser("site", help="the sites and their tokens")
-    sites = site.add_subparsers(title="site commands")
-    add = sites.add_parser("add", help="add a site; asks for the token")
-    add.add_argument("name")
-    add.add_argument("url", help="where the API is, e.g. https://example.com/api/")
-    add.add_argument(
-        "--token-stdin", action="store_true", help="read the token from stdin"
-    )
-    add.set_defaults(handler=site_add)
-    sites.add_parser("list", help="the sites").set_defaults(handler=site_list)
-    remove = sites.add_parser("remove", help="remove a site")
-    remove.add_argument("name")
-    remove.set_defaults(handler=site_remove)
-    default = sites.add_parser("default", help="use a site by default")
-    default.add_argument("name")
-    default.set_defaults(handler=site_default)
-
-    command("resources", resources, "the resources")
-    sub = command("schema", schema, "the regions and plugins, or one type's fields")
-    sub.add_argument("type", nargs="?", help="e.g. pages.page")
-
-    sub = command("list", list_objects, "list objects")
-    sub.add_argument("resource")
-    sub.add_argument("-f", "--filter", action="append", default=[], metavar="KEY=VALUE")
-    sub.add_argument("-q", help="search")
-    sub.add_argument("--limit", type=int)
-    sub.add_argument("--offset", type=int)
-    sub.add_argument("--fields", help="only these fields, comma separated")
-    sub.add_argument("--content", action="store_true", help="with content")
-    sub.add_argument("--expand", action="store_true", help="describe references")
-
-    sub = command("get", get, "one object")
-    sub.add_argument("resource")
-    sub.add_argument("id")
-    sub.add_argument("--nested", action="store_true", help="containers with children")
-    sub.add_argument("--expand", action="store_true", help="describe references")
-
-    sub = command("find", find, "an object by its path")
-    sub.add_argument("path")
-    sub.add_argument("--resource", default="pages")
-    sub.add_argument("--host")
-
-    sub = command("plugin", plugin, "one plugin of an object")
-    sub.add_argument("resource")
-    sub.add_argument("id")
-    sub.add_argument("type")
-    sub.add_argument("plugin_id")
-
-    def writing(sub, *, etag=True):
-        sub.add_argument(
-            "--apply", action="store_true", help="save; without it, a dry run"
-        )
-        if etag:
-            sub.add_argument("--etag", help="instead of the one last read")
-            sub.add_argument(
-                "--force", action="store_true", help="overwrite whatever is there"
-            )
-        return sub
-
-    sub = writing(command("create", create, "create an object from JSON"), etag=False)
-    sub.add_argument("resource")
-    sub.add_argument("file", nargs="?", help="JSON; stdin if left out or -")
-
-    sub = writing(command("update", update, "change fields, replace regions"))
-    sub.add_argument("resource")
-    sub.add_argument("id")
-    sub.add_argument("file", nargs="?", help="JSON; stdin if left out or -")
-
-    sub = writing(command("content", content, "replace the regions given"))
-    sub.add_argument("resource")
-    sub.add_argument("id")
-    sub.add_argument("file", nargs="?", help="JSON; stdin if left out or -")
-
-    sub = writing(command("update-plugin", update_plugin, "change one plugin's fields"))
-    sub.add_argument("resource")
-    sub.add_argument("id")
-    sub.add_argument("type")
-    sub.add_argument("plugin_id")
-    sub.add_argument("file", nargs="?", help="JSON; stdin if left out or -")
-
-    sub = writing(command("delete", delete, "delete an object"))
-    sub.add_argument("resource")
-    sub.add_argument("id")
-
-    sub = command("cache-clear", cache_clear, "delete an object's cached rendering")
-    sub.add_argument("resource")
-    sub.add_argument("id")
-
-    sub = command("upload", upload, "stage a file; prints the reference to write")
-    sub.add_argument("file")
-
-    sub = writing(
-        command("batch", batch, "several writes in one transaction"), etag=False
-    )
-    sub.add_argument("file", nargs="?", help="JSON; stdin if left out or -")
-    return parser
+    _written(apply, data)
 
 
 def main_exit():

@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Built on click and rich: `site list`, `resources` and `list` print
+  tables in a terminal, JSON with `--json` or when the output isn't a
+  terminal. `-h` works as `--help`.
+
 ## 0.2 (2026-11-17)
 
 - The version follows feincms3-api's: 0.2 talks to feincms3-api 0.2.
