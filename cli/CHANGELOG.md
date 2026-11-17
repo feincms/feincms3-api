@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.0.2 (2026-11-17)
+
 - Fixed: a batch deleting an object it created crashed after saving;
   `content` took a region called `content` for the wrapper.
 - Redirects aren't followed (they turned writes into reads and sent the
