@@ -24,10 +24,17 @@ class ReadingMixin:
         offset = _int(params.get("offset"), 0)
         content = _bool(params.get("content"))
         only = [field for field in params.get("fields", "").split(",") if field]
+        objs = list(queryset[offset : offset + limit])
+        plugins = resource.plugins_of(request, objs) if content else {}
         items = []
-        for obj in queryset[offset : offset + limit]:
+        for obj in objs:
             wire = resource.read(
-                request, obj, self, content=content, nested=_bool(params.get("nested"))
+                request,
+                obj,
+                self,
+                content=content,
+                nested=_bool(params.get("nested")),
+                plugins=plugins.get(obj.pk),
             )
             if only:
                 wire["fields"] = {

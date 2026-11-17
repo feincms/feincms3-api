@@ -12,7 +12,7 @@ from content_editor.admin import ContentEditorInline
 from django.contrib import admin
 from django.contrib.admin.utils import flatten_fieldsets
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.forms.models import _get_foreign_key
 from django.urls import NoReverseMatch, reverse
 
@@ -63,6 +63,20 @@ def warning(message, *, level=WARNING, path=None):
     if path is not None:
         entry["path"] = path
     return entry
+
+
+def _fetch_plugins(request, inlines, objs):
+    """``{pk: [(plugin, inline)]}`` of ``objs``, in order"""
+    result = {obj.pk: [] for obj in objs}
+    for inline in inlines:
+        attname = inline.model._meta.get_field(inline.fk_name).attname
+        for plugin in inline.get_queryset(request).filter(
+            Q(**{f"{inline.fk_name}__in": objs})
+        ):
+            result[getattr(plugin, attname)].append((plugin, inline))
+    for plugins in result.values():
+        plugins.sort(key=lambda pair: _plugin_order(pair[0]))
+    return result
 
 
 def _plugin_order(plugin):
@@ -338,46 +352,65 @@ class Resource:
 
     def plugins(self, request, inlines, obj):
         """
-        ``(visible, hidden)``: the object's plugins in order, those an inline
-        shows (as ``(plugin, inline)``) and those none does
+        The object's plugins in order, as ``(plugin, inline)``
 
         The inlines' querysets decide, as in the admin: feincms3-forms'
         proxies share a table, and each inline shows only its own type.
         """
-        visible, hidden = [], []
         if obj.pk is None:
-            return visible, hidden
-        shown = set()
-        for inline in inlines:
-            for plugin in inline.get_queryset(request).filter(
-                Q(**{inline.fk_name: obj})
-            ):
-                visible.append((plugin, inline))
-                shown.add((plugin._meta.concrete_model, plugin.pk))
+            return []
+        return _fetch_plugins(request, inlines, [obj])[obj.pk]
+
+    def plugins_of(self, request, objs):
+        """``{pk: plugins(...)}`` of several objects, one query per inline"""
+        groups = {}
+        for obj in objs:
+            inlines = self.plugin_inlines(request, obj)
+            key = tuple(type(inline) for inline in inlines)
+            groups.setdefault(key, (inlines, []))[1].append(obj)
+        result = {}
+        for inlines, members in groups.values():
+            result |= _fetch_plugins(request, inlines, members)
+        return result
+
+    def count_hidden_plugins(self, inlines, obj, visible):
+        """
+        How many plugins of ``obj`` in the inlines' tables no inline shows,
+        in one query
+        """
+        if obj.pk is None:
+            return 0
+        shown = {}
+        for plugin, _inline in visible:
+            shown.setdefault(plugin._meta.concrete_model, set()).add(plugin.pk)
         lookups = {}
         for inline in inlines:
             lookups.setdefault(inline.model._meta.concrete_model, inline.fk_name)
-        for concrete, fk_name in lookups.items():
-            hidden.extend(
-                plugin
-                for plugin in concrete._base_manager.filter(Q(**{fk_name: obj}))
-                if (concrete, plugin.pk) not in shown
-            )
-        visible.sort(key=lambda pair: _plugin_order(pair[0]))
-        hidden.sort(key=_plugin_order)
-        return visible, hidden
+        querysets = [
+            concrete._base_manager.filter(Q(**{fk_name: obj}))
+            .exclude(pk__in=shown.get(concrete, ()))
+            .order_by()
+            .values_list(Value(1))
+            for concrete, fk_name in lookups.items()
+        ]
+        if not querysets:
+            return 0
+        return querysets[0].union(*querysets[1:], all=True).count()
 
-    def read_content(self, request, obj, api, warnings):
-        """``(content, container types)``, the content flat with depths"""
+    def read_content(self, request, obj, api, warnings, *, plugins=None):
+        """
+        ``(content, container types)``, the content flat with depths;
+        ``plugins`` are the object's from ``plugins_of()``, if fetched already
+        """
         inlines = self.plugin_inlines(request, obj)
         if not inlines:
             return None, set()
         by_model = {inline.model: inline for inline in inlines}
-        visible, hidden = self.plugins(request, inlines, obj)
-        if hidden:
+        visible = self.plugins(request, inlines, obj) if plugins is None else plugins
+        if hidden := self.count_hidden_plugins(inlines, obj, visible):
             warnings.append(
                 warning(
-                    f"{len(hidden)} plugin(s) aren't shown: no inline for their"
+                    f"{hidden} plugin(s) aren't shown: no inline for their"
                     " type, or no permission to see it.",
                     path="content",
                 )
@@ -419,7 +452,7 @@ class Resource:
         }
         return content, containers
 
-    def read(self, request, obj, api, *, content=True, nested=False):
+    def read(self, request, obj, api, *, content=True, nested=False, plugins=None):
         context = self.context(request, obj, api)
         warnings = []
         wire = {
@@ -429,7 +462,9 @@ class Resource:
         }
         containers = set()
         if content:
-            data, containers = self.read_content(request, obj, api, warnings)
+            data, containers = self.read_content(
+                request, obj, api, warnings, plugins=plugins
+            )
             if data is not None:
                 wire["content"] = data
             if (inlines := self.read_inlines(request, obj, api)) is not None:

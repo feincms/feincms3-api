@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Fewer queries: hidden plugins are counted in one query instead of read
+  per plugin table, and lists with `content=true` fetch the plugins once
+  per inline for all items. `Resource.plugins()` returns only the visible
+  plugins; `count_hidden_plugins()` and `plugins_of()` are new.
 - Added `DELETE /{resource}/{id}/cache/` (`ContentAPI.clear_cache()`) to
   delete an object's cached rendering, so a client can check its changes on
   the site at once; `Resource.cache_keys()` says which keys.

@@ -81,7 +81,7 @@ class Planner:
 
         self.rows = {inline: [] for inline in self.inlines}
         self.existing = {}
-        visible, _hidden = resource.plugins(request, plugin_inlines, obj)
+        visible = resource.plugins(request, plugin_inlines, obj)
         positions = {}
         for plugin, inline in visible:
             index = positions.get(plugin.region, 0)
