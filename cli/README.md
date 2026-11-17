@@ -87,6 +87,13 @@ The links point to where the CLI is installed, so upgrading it upgrades
 the skills; run `install` again when an upgrade brings new ones.
 `CLAUDE_CONFIG_DIR` moves `~/.claude`.
 
+The skills:
+
+- `feincms3-translate`: translate a page or a subtree into another
+  language, as inactive copies for the editors to review.
+- `feincms3-dummy-content`: a page per page type with every plugin, below
+  one page which can be removed again.
+
 ## Errors
 
 Errors go to stderr with their paths:

@@ -297,37 +297,43 @@ class CLITest(LiveServerTestCase):
                 ["testapp.richtext"],
             )
 
-    def test_translate_skill_batch_example(self):
-        """The skill's batch example passes a dry run"""
-        text = (
-            CLI / "feincms3_api_cli" / "skills" / "feincms3-translate" / "SKILL.md"
-        ).read_text()
+    def page(self, pk, slug, **kwargs):
+        return Page.objects.create(
+            pk=pk,
+            title=slug,
+            slug=slug,
+            page_type="standard",
+            is_active=True,
+            **kwargs,
+        )
+
+    def dry_run_example(self, skill):
+        """A skill's batch example passes a dry run"""
+        text = (CLI / "feincms3_api_cli" / "skills" / skill / "SKILL.md").read_text()
         example = re.search(r"```json\n(.*?)```", text, re.DOTALL)[1]
         # The test app's types are testapp.*, not pages.*
         example = example.replace('"pages.', '"testapp.')
-
-        def page(pk, slug, **kwargs):
-            return Page.objects.create(
-                pk=pk,
-                title=slug,
-                slug=slug,
-                page_type="standard",
-                is_active=True,
-                **kwargs,
-            )
-
-        fr = page(5, "fr", language_code="fr", translation_of=self.home)
-        angebot = page(17, "angebot", parent=self.home, language_code="de")
-        page(18, "kurse", parent=angebot, language_code="de")
-        kontakt = page(44, "kontakt", parent=self.home, language_code="de")
-        page(45, "contact", parent=fr, language_code="fr", translation_of=kontakt)
-
-        path = Path(self.dirs.name) / "translation.json"
+        path = Path(self.dirs.name) / f"{skill}.json"
         path.write_text(example)
         code, data, err = self.run_cli("batch", path)
         self.assertEqual(code, 0, err)
+        return data
+
+    def test_translate_skill_example(self):
+        fr = self.page(5, "fr", language_code="fr", translation_of=self.home)
+        angebot = self.page(17, "angebot", parent=self.home, language_code="de")
+        self.page(18, "kurse", parent=angebot, language_code="de")
+        kontakt = self.page(44, "kontakt", parent=self.home, language_code="de")
+        self.page(45, "contact", parent=fr, language_code="fr", translation_of=kontakt)
+        data = self.dry_run_example("feincms3-translate")
         self.assertEqual(len(data["results"]), 2)
         self.assertFalse(Page.objects.filter(slug="offre").exists())
+
+    def test_dummy_content_skill_example(self):
+        self.page(3, "start", parent=self.home, language_code="de")
+        data = self.dry_run_example("feincms3-dummy-content")
+        self.assertEqual(len(data["results"]), 2)
+        self.assertFalse(Page.objects.filter(slug="dummy-content").exists())
 
 
 class ScriptsTest(SimpleTestCase):
@@ -356,10 +362,15 @@ def command_lines(text):
     code, up to a pipe or a redirection
     """
     text = text.replace("\\\n", " ")
+    blocks = re.findall(r"^```[a-z]*\n(.*?)^```", text, re.DOTALL | re.MULTILINE)
     candidates = [
-        line.strip() for line in text.split("\n") if line.strip().startswith("f3api ")
+        line.strip()
+        for block in blocks
+        for line in block.split("\n")
+        if line.strip().startswith("f3api ")
     ]
-    candidates += re.findall(r"`(f3api [^`]+)`", text)
+    prose = re.sub(r"^```.*?^```", "", text, flags=re.DOTALL | re.MULTILINE)
+    candidates += re.findall(r"`(f3api [^`]+)`", prose)
     for candidate in candidates:
         args = []
         for token in shlex.split(candidate, comments=True)[1:]:
@@ -441,6 +452,16 @@ class SkillsTest(SimpleTestCase):
         self.assertEqual(
             list(command_lines("x `f3api get pages 1 --expand` y")),
             [("f3api get pages 1 --expand", ["get", "pages", "1", "--expand"])],
+        )
+        # Lines in code blocks, not prose which happens to start so
+        self.assertEqual(
+            [
+                args
+                for _line, args in command_lines(
+                    "the\nf3api CLI: x\n```bash\nf3api list pages | jq .\n```\n"
+                )
+            ],
+            [["list", "pages"]],
         )
         self.assertEqual(parses(["get", "pages", "1", "--expand"])[0], 0)
         self.assertEqual(parses(["get", "pages", "1", "--expanded"])[0], 2)
