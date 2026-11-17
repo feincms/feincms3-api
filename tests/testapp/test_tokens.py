@@ -156,6 +156,9 @@ class TokenAdminTest(TestCase):
         secret = response.context["secret"]
         self.assertContains(response, secret)
         self.assertEqual(APIToken.objects.for_secret(secret), token)
+        # The admin's breadcrumbs, whose markup changes between versions
+        self.assertContains(response, 'class="breadcrumbs"')
+        self.assertContains(response, "API token created")
 
     def test_only_own_tokens(self):
         own, _secret = APIToken.objects.create_token(user=self.staff, name="own")

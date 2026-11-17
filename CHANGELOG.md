@@ -2,6 +2,8 @@
 
 ## Next version
 
+- The "token created" page uses the admin's own breadcrumbs, which Django
+  6.1 renders with new markup.
 ## 0.2 (2026-11-17)
 
 - The token admin's user defaults to the current user.
