@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.3 (2026-11-17)
+
 - The "token created" page uses the admin's own breadcrumbs, which Django
   6.1 renders with new markup.
 - Paths below the API's prefix which match nothing are a JSON `404`
