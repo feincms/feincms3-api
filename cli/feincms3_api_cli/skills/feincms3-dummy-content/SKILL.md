@@ -80,9 +80,13 @@ content in every region:
   children (`depth`).
 - **Plausible text** in the site's language, matching the field: short
   titles, a few sentences in leads, several paragraphs with headings and
-  lists in rich text, using only the tags `x-feincms3-html` allows. Vary
-  the lengths: one plugin short, one long, to show how the layout copes.
-  No "Lorem ipsum" unless the user wants it.
+  lists in rich text. Vary the lengths: one plugin short, one long, to
+  show how the layout copes. No "Lorem ipsum" unless the user wants it.
+- **Write `html` fields as Markdown** and convert them to HTML only when
+  writing the batch file (pandoc, or Python's `markdown` package, e.g.
+  with `uv run --with markdown`): shorter to write than HTML. Don't fuss
+  over the tags `x-feincms3-html` allows: it's dummy content, and where
+  the field is `sanitized`, the server drops what isn't allowed.
 - **Choices**: valid values (`enum`); show different ones in different
   plugins.
 - **Links and references**: to other dummy pages (by `ref`) and to
