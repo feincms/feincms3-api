@@ -300,8 +300,23 @@ open an issue, it may point to something the API should handle itself.
   writing, and expire after `TOKEN_LIFETIME` (8 hours by default). For
   scripts and agents, create a staff user with only the permissions they
   need rather than using a superuser's token.
-- **Cleanup**: run `./manage.py f3api_cleanup` daily (cron, a systemd
-  timer); it removes expired tokens and uploads.
+- **Cleanup**: run `./manage.py f3api_cleanup` daily; it removes expired
+  tokens and uploads. Set it up wherever the servers' scheduled jobs live
+  (a crontab, a systemd timer, a Kubernetes `CronJob`), which often isn't
+  the project's repository.
+- **Basic auth gates**: a staging site behind basic auth (django-curtains'
+  `basic_auth`, or the web server's) blocks every token: both use the
+  `Authorization` header, and a request can only send one. Exempt the
+  API's path from the gate; the API authenticates every request itself.
+  With django-curtains:
+
+  ```python
+  BASIC_AUTH_EXEMPT = r"^/api/content/"
+  ```
+
+- **Dependencies**: install a released version for deployments. An
+  editable checkout (`[tool.uv] sources` with a `path`) is handy while
+  integrating, but a container build can't reach it.
 - **Uploads** are staged in `UPLOAD_STORAGE` (the default storage) for
   `UPLOAD_LIFETIME` (a day) until a write uses them.
 - **Clients**: the [CLI](../cli/README.md) (`uvx feincms3-api-cli`) is the
@@ -318,5 +333,7 @@ open an issue, it may point to something the API should handle itself.
       `excluded:` lines.
 - [ ] Side effects of saving use `transaction.on_commit()`.
 - [ ] `cache_keys()` covers what the project caches.
-- [ ] `f3api_cleanup` runs daily.
+- [ ] `f3api_cleanup` runs daily on every server.
+- [ ] Basic auth gates exempt the API's path.
+- [ ] Deployments install a released version, not a local checkout.
 - [ ] Scripts and agents have their own users with limited permissions.
