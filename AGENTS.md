@@ -57,6 +57,8 @@
 - `.github/workflows/publish.yml` publishes on tags: `1.2.3` publishes
   feincms3-api, `cli-1.2.3` feincms3-api-cli (from `cli/`). The tag has to
   match the package's `__version__` (`0.1` matches `0.1.0`).
+- The CLI's versions follow feincms3-api's: release it with the same
+  version (`cd cli && make-release 0.3`) when both change.
 - The maintainer releases with `make-release` (in `cli/` for the CLI, which
   has its own `CHANGELOG.md`): it dates the changelog, bumps the version,
   commits, tags and pushes.
