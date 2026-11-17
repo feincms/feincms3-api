@@ -2,10 +2,22 @@
 
 ## Next version
 
+## 0.1.0 (2026-11-17)
+
+Backwards incompatible:
+
 - Removed the incubator's autotranslate (and the `autotranslate` and
   `anthropic` extras): translating is done over the API, see
   `docs/translating.md`. Remove `feincms3_api.incubator.autotranslate`
   from `INSTALLED_APPS`.
+- Creating a page needs `is_active`: feincms3 defaults to active, so a
+  client has to decide. Resources list such fields in `required_on_create`
+  (also an argument), which the type's schema marks as `required`.
+- The plugin `PATCH` returns the object's `meta.warnings` and `etag` in the
+  plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
+
+Other changes:
+
 - Added `feincms3-api-cli` (`cli/`, command `f3api`), a separate package:
   the API from the command line, with dry runs unless `--apply`, the ETags
   of what was read sent automatically, and errors with their paths.
@@ -22,9 +34,6 @@
   superuser sees them), with plugins as a `oneOf` by `type` per region, so
   generated clients get real types. They are built when the schema is
   first requested, not at startup.
-- Creating a page needs `is_active`: feincms3 defaults to active, so a
-  client has to decide. Resources list such fields in `required_on_create`
-  (also an argument), which the type's schema marks as `required`.
 - Fewer queries: hidden plugins are counted in one query instead of read
   per plugin table, and lists with `content=true` fetch the plugins once
   per inline for all items. `Resource.plugins()` returns only the visible
@@ -32,8 +41,6 @@
 - Added `DELETE /{resource}/{id}/cache/` (`ContentAPI.clear_cache()`) to
   delete an object's cached rendering, so a client can check its changes on
   the site at once; `Resource.cache_keys()` says which keys.
-- The plugin `PATCH` returns the object's `meta.warnings` and `etag` in the
-  plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
 - A system check (`feincms3_api.E003`) reports a registered model's admin
   with two inlines for the same model, which the API can't tell apart.
 - Documented the setup in the README, and the code's structure in
