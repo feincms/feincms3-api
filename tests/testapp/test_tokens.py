@@ -114,6 +114,20 @@ class TokenAdminTest(TestCase):
         response = self.client.get("/admin/feincms3_api/apitoken/add/")
         self.assertContains(response, 'type="radio" name="access" value="read"')
 
+    def test_name_is_optional(self):
+        response = self.client.post(
+            "/admin/feincms3_api/apitoken/add/",
+            {
+                "name": "",
+                "access": "read",
+                "expires_at_0": "2099-01-01",
+                "expires_at_1": "00:00:00",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        token = APIToken.objects.get()
+        self.assertEqual(str(token), f"{token.prefix}…")
+
     def test_create_own_token(self):
         # No model permissions needed
         response = self.client.post(

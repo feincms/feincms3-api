@@ -46,7 +46,7 @@ def default_expiry():
 
 
 class APITokenQuerySet(models.QuerySet):
-    def create_token(self, *, user, name, access="read", expires_at=None):
+    def create_token(self, *, user, name="", access="read", expires_at=None):
         """Create a token, and return it with its secret, which isn't stored"""
         token = self.model(user=user, name=name, access=access)
         if expires_at is not None:
@@ -94,7 +94,10 @@ class APIToken(models.Model):
         help_text=_("The token acts with this user's permissions, never more."),
     )
     name = models.CharField(
-        _("name"), max_length=200, help_text=_("What or who uses the token.")
+        _("name"),
+        max_length=200,
+        blank=True,
+        help_text=_("What or who uses the token."),
     )
     access = models.CharField(
         _("access"), max_length=10, choices=Access.choices, default=Access.READ
@@ -115,7 +118,7 @@ class APIToken(models.Model):
         verbose_name_plural = _("API tokens")
 
     def __str__(self):
-        return f"{self.name} ({self.prefix}…)"
+        return f"{self.name} ({self.prefix}…)" if self.name else f"{self.prefix}…"
 
     def set_secret(self):
         """Give the token a new secret and return it; only its hash is kept"""

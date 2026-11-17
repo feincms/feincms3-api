@@ -2,7 +2,8 @@
 
 ## Next version
 
-- The token admin shows the access as radio buttons.
+- The token admin shows the access as radio buttons and the user as a raw
+  id field; the token's name is optional.
 - Kinds: `link` and `*_link` are link names, feincms3's HTML plugin's `html`
   is `machine`, and the new `KINDS` setting sets the kind per field or JSON
   path where the type and name don't tell (system check

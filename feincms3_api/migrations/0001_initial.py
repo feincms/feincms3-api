@@ -30,6 +30,7 @@ class Migration(migrations.Migration):
                 (
                     "name",
                     models.CharField(
+                        blank=True,
                         help_text="What or who uses the token.",
                         max_length=200,
                         verbose_name="name",
