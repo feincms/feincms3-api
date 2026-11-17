@@ -1,9 +1,12 @@
 import io
+import tempfile
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.test import override_settings
 from django.utils import timezone
 
 from feincms3_api.models import Upload
@@ -12,6 +15,15 @@ from testapp.test_write import WriteTestCase
 
 
 class UploadTest(WriteTestCase):
+    def setUp(self):
+        super().setUp()
+        # A storage of its own, so that what's left in it is this test's
+        media = tempfile.TemporaryDirectory()
+        self.addCleanup(media.cleanup)
+        setting = override_settings(MEDIA_ROOT=media.name)
+        setting.enable()
+        self.addCleanup(setting.disable)
+
     def upload(self, name="liste.pdf", content=b"%PDF-1.4 neu"):
         response = self.client.post(
             "/api/uploads/", {"file": SimpleUploadedFile(name, content)}
@@ -73,12 +85,54 @@ class UploadTest(WriteTestCase):
         self.assertEqual(Download.objects.filter(parent=self.home).count(), 1)
 
     def test_dry_run_keeps_the_upload(self):
-        data = self.upload()
+        data = self.upload(name="trocken.pdf")
         response = self.put_download({"upload": data["upload"]}, dry_run="true")
         self.assertEqual(response.status_code, 200, response.content)
         self.assertTrue(Upload.objects.exists())
         self.download.refresh_from_db()
         self.assertTrue(self.download.file.name.startswith("downloads/preise"))
+        # The copy the plugin's field stored was removed again
+        self.assertEqual(self.stored("trocken"), [])
+
+    def stored(self, prefix):
+        try:
+            names = default_storage.listdir("downloads")[1]
+        except FileNotFoundError:
+            return []
+        return [name for name in names if name.startswith(prefix)]
+
+    def test_failed_batch_removes_stored_files(self):
+        data = self.upload(name="batch.pdf")
+        path = f"pages/{self.angebot.pk}/"
+        operations = [
+            {
+                "op": "update_plugin",
+                "resource": "pages",
+                "id": self.angebot.pk,
+                "etag": self.etag(path),
+                "plugin": {"type": "testapp.download", "id": self.download.pk},
+                "fields": {"file": {"upload": data["upload"]}},
+            },
+            {
+                "op": "update",
+                "resource": "pages",
+                "id": self.angebot.pk,
+                "fields": {"title": ""},
+            },
+        ]
+        response = self.send("post", "batch/", {"operations": operations})
+        self.assertEqual(response.status_code, 422, response.content)
+        self.assertEqual(self.stored("batch"), [])
+        self.assertTrue(Upload.objects.exists())
+
+    def test_saved_write_keeps_the_stored_file(self):
+        data = self.upload(name="bleibt.pdf")
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.put_download({"upload": data["upload"]})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.download.refresh_from_db()
+        self.assertTrue(self.download.file.name.startswith("downloads/bleibt"))
+        self.assertTrue(default_storage.exists(self.download.file.name))
 
     def test_keep_and_clear(self):
         current = self.get(f"pages/{self.angebot.pk}/").json()["content"]["main"][5]

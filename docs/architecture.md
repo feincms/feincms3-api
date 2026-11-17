@@ -128,7 +128,9 @@ included) and describes them with `Resource.describe()`, in
 `APIToken` stores an HMAC of the secret, is found by it, and acts as its
 user; staff users manage their own tokens in the admin. `Upload` stages a
 file for a later write; the target field saves a copy with its own
-`upload_to` once the write uses it.
+`upload_to` once the write uses it. `stored.py` deletes those copies again
+when the write or its batch is rolled back (a dry run, an error), since
+rolling back the transaction doesn't remove files.
 
 **Settings and checks** (`conf.py`, `apps.py`): `FEINCMS3_API`, and system
 checks for resources without an admin and for `EXCLUDE_FIELDS` and

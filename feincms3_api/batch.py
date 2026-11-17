@@ -8,6 +8,7 @@ the id of an object created earlier in the batch, wherever an id goes.
 
 from django.db import transaction
 
+from feincms3_api import stored
 from feincms3_api.conf import config
 from feincms3_api.errors import APIError, ValidationFailedError
 from feincms3_api.writing import forget_ids
@@ -56,7 +57,7 @@ class BatchMixin:
         """
         operations = _check(payload)
         refs, created, written, results = {}, [], set(), []
-        with transaction.atomic():
+        with stored.collecting(dry_run=dry_run), transaction.atomic():
             for index, given in enumerate(operations):
                 try:
                     operation = _resolve(given, refs, "", mapping=True)

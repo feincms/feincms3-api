@@ -14,6 +14,7 @@ from django import forms
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import models, transaction
 
+from feincms3_api import stored
 from feincms3_api.codecs import KIND, Field, UploadRef, codecs as default_codecs
 from feincms3_api.conf import excluded_paths, kind_paths
 from feincms3_api.errors import WireError
@@ -129,7 +130,7 @@ def resolve_upload(request, ref):
     except (Upload.DoesNotExist, ValidationError, ValueError) as exc:
         raise WireError("No such upload of yours, or it has expired.") from exc
     transaction.on_commit(upload.discard)
-    return upload.as_file()
+    return stored.handed_to_form(upload.as_file())
 
 
 class FormAdapter:

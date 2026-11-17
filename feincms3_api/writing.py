@@ -12,6 +12,7 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
+from feincms3_api import stored
 from feincms3_api.adapters import form_errors
 from feincms3_api.codecs import label
 from feincms3_api.conf import config
@@ -130,11 +131,16 @@ class WritingMixin:
                 [{"path": key, "message": "Unknown key."} for key in sorted(unknown)]
             )
         adding = obj is None
-        with transaction.atomic():
+        with stored.collecting(dry_run=dry_run), transaction.atomic():
             form, target, bound = self._validate(
                 request, resource, obj, payload, plugin=plugin
             )
-            self._save(request, resource, form, target, bound, adding=adding)
+            try:
+                self._save(request, resource, form, target, bound, adding=adding)
+            finally:
+                stored.record(
+                    [form, *(each for one in bound for each in one.formset.forms)]
+                )
             result = read(target) if read else resource.read(request, target, self)
             new = created_objects(bound)
             if adding:

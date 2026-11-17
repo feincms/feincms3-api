@@ -604,6 +604,12 @@ depend on the instance, which doesn't exist yet at upload time. The other
 way, multipart writes carrying the JSON and the files together, would make
 every write endpoint deal with multipart.
 
+Saving the object stores the target field's copy before the transaction
+ends. A dry run, a failed write or a failed batch rolls back the rows but
+not the files, so the outermost write or batch deletes the copies its
+uploads were stored as unless it's saved; the uploads themselves stay for
+the next try.
+
 Uploading from a URL (`{"url": "https://…"}`) is left out: the server
 fetching arbitrary URLs is a request forgery risk, and the client can fetch
 and upload just as well.

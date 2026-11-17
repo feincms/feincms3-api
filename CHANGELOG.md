@@ -6,6 +6,8 @@
   6.1 renders with new markup.
 - Paths below the API's prefix which match nothing are a JSON `404`
   naming the resources, not the site's HTML 404 page.
+- Fixed: dry runs, and writes or batches which failed, left the copies of
+  their uploads in the target fields' storage.
 
 ## 0.2 (2026-11-17)
 
