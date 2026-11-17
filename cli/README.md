@@ -6,7 +6,7 @@ token, so it works against any site with the API, without the site's code.
 Standard library only.
 
 ```bash
-uvx --from feincms3-api-cli f3api --help   # or: pip install feincms3-api-cli
+uvx feincms3-api-cli --help        # or: pip install feincms3-api-cli
 ```
 
 ## Sites
