@@ -114,6 +114,17 @@ class TokenAdminTest(TestCase):
         response = self.client.get("/admin/feincms3_api/apitoken/add/")
         self.assertContains(response, 'type="radio" name="access" value="read"')
 
+    def test_superuser_defaults_to_themselves(self):
+        admin = User.objects.create_superuser("admin", "", "admin")
+        self.client.force_login(admin)
+        response = self.client.get("/admin/feincms3_api/apitoken/add/")
+        self.assertContains(response, f'name="user" value="{admin.pk}"')
+        # ?user= still wins
+        response = self.client.get(
+            f"/admin/feincms3_api/apitoken/add/?user={self.other.pk}"
+        )
+        self.assertContains(response, f'name="user" value="{self.other.pk}"')
+
     def test_name_is_optional(self):
         response = self.client.post(
             "/admin/feincms3_api/apitoken/add/",

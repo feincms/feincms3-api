@@ -44,6 +44,10 @@ class APITokenAdmin(admin.ModelAdmin):
             fields += self.readonly_fields
         return fields
 
+    def get_changeform_initial_data(self, request):
+        # Superusers may create tokens for others, but mostly for themselves
+        return {"user": request.user.pk, **super().get_changeform_initial_data(request)}
+
     def get_readonly_fields(self, request, obj=None):
         if obj is not None:
             return ["user", *self.readonly_fields]
