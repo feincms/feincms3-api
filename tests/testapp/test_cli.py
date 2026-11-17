@@ -94,6 +94,9 @@ class CLITest(LiveServerTestCase):
         code, data, err = self.run_cli("get", "pages", 0)
         self.assertEqual(code, 5)
         self.assertIn("404", err)
+        code, data, err = self.run_cli("list", "page")
+        self.assertEqual(code, 5)
+        self.assertIn("No resource 'page'. The resources: pages,", err)
 
     def test_tables(self):
         code, out, err = self.run_cli("list", "pages", tty=True)
@@ -247,6 +250,14 @@ class CLITest(LiveServerTestCase):
             code, _data, err = self.run_cli("list", "pages")
         self.assertEqual(code, 1)
         self.assertIn("redirected to", err)
+        # Not the API: no HTML error pages
+        with mock.patch.dict(
+            os.environ, {"F3API_URL": f"{self.live_server_url}/nothing/"}
+        ):
+            code, _data, err = self.run_cli("list", "pages")
+        self.assertEqual(code, 5)
+        self.assertIn("404 Not Found (http", err)
+        self.assertNotIn("<", err)
 
     def test_batch_delete_ref(self):
         operations = [

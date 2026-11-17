@@ -4,6 +4,9 @@
 
 - The "token created" page uses the admin's own breadcrumbs, which Django
   6.1 renders with new markup.
+- Paths below the API's prefix which match nothing are a JSON `404`
+  naming the resources, not the site's HTML 404 page.
+
 ## 0.2 (2026-11-17)
 
 - The token admin's user defaults to the current user.

@@ -6,7 +6,7 @@ from typing import Any
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from ninja import Body, File, Router, Schema, UploadedFile
 
-from feincms3_api.errors import APIError
+from feincms3_api.errors import APIError, NotFoundError
 from feincms3_api.openapi import component_name
 from feincms3_api.reading import _bool, expands_references
 
@@ -65,6 +65,30 @@ def build_router(api):
 
     for resource in api.resources:
         _add_routes(api, router, resource, api.components)
+
+    # Last, so that it only gets what no route above matched: a JSON answer
+    # instead of the site's HTML 404 page
+    @router.api_operation(
+        ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        "{path:rest}",
+        include_in_schema=False,
+    )
+    @_errors
+    def not_found(request, rest: str):
+        names = [
+            resource.name
+            for resource in api.resources
+            if resource.has_view_permission(request)
+        ]
+        name = rest.split("/", maxsplit=1)[0]
+        if name not in [*names, "schema", "uploads", "batch"]:
+            raise NotFoundError(
+                f"No resource {name!r}. The resources: {', '.join(names)}."
+            )
+        if not rest.endswith("/"):
+            raise NotFoundError(f"Nothing at {rest!r}; the paths end in a slash.")
+        raise NotFoundError(f"Nothing at {rest!r}.")
+
     return router
 
 

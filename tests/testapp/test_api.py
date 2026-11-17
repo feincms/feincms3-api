@@ -295,7 +295,21 @@ class ReadTest(APITestCase):
     def test_not_found(self):
         self.assertEqual(self.get("pages/0/").status_code, 404)
         self.assertEqual(self.get("pages/abc/").status_code, 404)
-        self.assertEqual(self.get("nothing/").status_code, 404)
+        # Paths no route matches: JSON, not the site's HTML 404 page
+        response = self.get("page/")
+        self.assertEqual(response.status_code, 404)
+        detail = response.json()["detail"]
+        self.assertIn("No resource 'page'.", detail)
+        self.assertIn("pages, articles", detail)
+        self.assertIn("slash", self.get("pages").json()["detail"])
+        self.assertEqual(
+            self.get("pages/1/nothing/").json()["detail"],
+            "Nothing at 'pages/1/nothing/'.",
+        )
+        response = self.client.post(
+            "/api/nothing/", {}, content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_wrong_region(self):
         RichText.objects.create(parent=self.angebot, region="sidebar", text="<p>x</p>")
@@ -390,6 +404,8 @@ class PermissionTest(APITestCase):
         self.client.logout()
         self.assertEqual(self.get("pages/").status_code, 401)
         self.assertEqual(self.get("schema/").status_code, 401)
+        # Unknown paths don't name the resources
+        self.assertEqual(self.get("nothing/").status_code, 401)
 
     def test_not_staff(self):
         user = User.objects.create_user("user", "", "user")

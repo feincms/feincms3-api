@@ -10,6 +10,8 @@
   `--project`).
 - The `feincms3-translate` skill: translating pages and subtrees with
   `f3api`, as inactive copies in one batch.
+- An error answer which isn't JSON (a site's HTML 404 page) is shown as
+  its status, reason and URL, not as its HTML.
 
 ## 0.2 (2026-11-17)
 

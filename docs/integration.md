@@ -67,6 +67,11 @@ sessions by default):
 api.add_router("/content/", content_api.router)
 ```
 
+The API answers paths below its prefix which match nothing with a JSON
+`404` (naming the resources, for a mistyped one) rather than the site's
+404 page. URLs mounted below the API's prefix (`api/content/other/`) go
+before it in `urlpatterns`.
+
 ## Choosing resources
 
 Only registered models are exposed. Pick the resource class by what the

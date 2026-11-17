@@ -77,7 +77,8 @@ class Client:
             try:
                 data = json.loads(content)
             except ValueError:
-                data = {"detail": content.decode(errors="replace") or exc.reason}
+                # Not the API's answer (an HTML error page): its reason only
+                data = {"detail": f"{exc.reason} ({request.full_url})."}
             raise APIError(exc.code, data) from None
         except urllib.error.URLError as exc:
             raise TransportError(f"Can't connect to {self.url}: {exc.reason}") from None
