@@ -48,3 +48,12 @@
   after every commit, and always with the tests passing.
 - Keep commit messages short and don't repeat what the diff or changelog
   already says; a concise subject line is usually enough.
+
+## Releases
+
+- `.github/workflows/publish.yml` publishes on tags: `1.2.3` publishes
+  feincms3-api, `cli-1.2.3` feincms3-api-cli (from `cli/`). The tag has to
+  match the package's `__version__`. Date the changelog's section and bump
+  the version in one commit; the maintainer pushes the tags.
+- The README is the PyPI description: link to files in the repository with
+  absolute GitHub URLs.

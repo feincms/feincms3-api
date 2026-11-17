@@ -18,13 +18,13 @@ formsets, save hooks and permissions. A plugin with custom validation, or a
 project hooking `save_formset()`, behaves the same through the API without
 any code for the API.
 
-- [How it's built](docs/architecture.md): the modules and where a project
+- [How it's built](https://github.com/feincms/feincms3-api/blob/main/docs/architecture.md): the modules and where a project
   plugs in.
-- [The spec](specs/api.md): the design and the reasoning behind it.
+- [The spec](https://github.com/feincms/feincms3-api/blob/main/specs/api.md): the design and the reasoning behind it.
 - [Issues](https://github.com/feincms/feincms3-api/issues): what's planned.
-- [feincms3-api-cli](cli/README.md): the API from the command line
+- [feincms3-api-cli](https://github.com/feincms/feincms3-api/blob/main/cli/README.md): the API from the command line
   (`f3api`), for people and agents with a shell.
-- [Translating](docs/translating.md) content over the API.
+- [Translating](https://github.com/feincms/feincms3-api/blob/main/docs/translating.md) content over the API.
 
 ## Setup
 
