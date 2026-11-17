@@ -25,6 +25,7 @@ class APITokenAdmin(admin.ModelAdmin):
         "last_used_at",
     ]
     list_filter = ["access"]
+    radio_fields = {"access": admin.HORIZONTAL}
     search_fields = ["name", "prefix"]
     readonly_fields = ["prefix", "created_at", "last_used_at"]
 

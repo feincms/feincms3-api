@@ -110,6 +110,10 @@ class TokenAdminTest(TestCase):
         self.other = User.objects.create_user("other", "", "other", is_staff=True)
         self.client.force_login(self.staff)
 
+    def test_access_as_radio_buttons(self):
+        response = self.client.get("/admin/feincms3_api/apitoken/add/")
+        self.assertContains(response, 'type="radio" name="access" value="read"')
+
     def test_create_own_token(self):
         # No model permissions needed
         response = self.client.post(
