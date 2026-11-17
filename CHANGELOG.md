@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.2 (2026-11-17)
+
 - The token admin's user defaults to the current user.
 - `?q=` on a resource whose admin has no `search_fields` is a `400`
   instead of returning everything; `/schema/` lists each resource's
