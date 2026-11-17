@@ -93,6 +93,9 @@ The skills:
   language, as inactive copies for the editors to review.
 - `feincms3-dummy-content`: a page per page type with every plugin, below
   one page which can be removed again.
+- `feincms3-review`: check content for broken references and links,
+  missing translations and alt texts, spelling and register; a report,
+  fixes only when asked.
 
 ## Errors
 
