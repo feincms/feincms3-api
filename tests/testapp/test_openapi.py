@@ -44,6 +44,7 @@ class OpenAPITest(WriteTestCase):
             schema(paths["/api/pages/{pk}/content/"]["put"]),
             f"{SCHEMAS}TestappPageContentWrite",
         )
+        self.assertEqual(schema(paths["/api/batch/"]["post"]), f"{SCHEMAS}Batch")
         plugin = paths["/api/pages/{pk}/plugins/{type_label}/{plugin_id}/"]
         self.assertEqual(schema(plugin["patch"]), f"{SCHEMAS}PluginWrite")
         self.assertEqual(schema(plugin["patch"], "200"), f"{SCHEMAS}TestappPagePlugin")
@@ -53,7 +54,9 @@ class OpenAPITest(WriteTestCase):
         page = schemas["TestappPage"]
         self.assertEqual(page["properties"]["type"], {"const": "testapp.page"})
         self.assertEqual(page["properties"]["id"], {"type": "integer"})
-        self.assertEqual(page["properties"]["content"]["$ref"], f"{SCHEMAS}TestappPageContent")
+        self.assertEqual(
+            page["properties"]["content"]["$ref"], f"{SCHEMAS}TestappPageContent"
+        )
         self.assertEqual(
             schemas["TestappPageList"]["properties"]["items"]["items"]["$ref"],
             f"{SCHEMAS}TestappPage",
@@ -102,7 +105,9 @@ class OpenAPITest(WriteTestCase):
         self.assertEqual(self.get("schema/testapp.richtext/").status_code, 404)
         schemas = self.openapi()["components"]["schemas"]
         self.assertIn("TestappRichtext", schemas)
-        self.assertNotIn("readOnly", schemas["TestappPageFields"]["properties"]["title"])
+        self.assertNotIn(
+            "readOnly", schemas["TestappPageFields"]["properties"]["title"]
+        )
 
     def test_validation(self):
         # The bodies are validated as before, the rest is the operations'
@@ -139,7 +144,9 @@ class ComponentsTest(SimpleTestCase):
             {
                 "$defs": {"item": {"type": "string"}},
                 "properties": {
-                    "items": {"items": {"$ref": "#/components/schemas/XFields/$defs/item"}}
+                    "items": {
+                        "items": {"$ref": "#/components/schemas/XFields/$defs/item"}
+                    }
                 },
                 "x-other": {"$ref": "https://example.com/schema"},
             },

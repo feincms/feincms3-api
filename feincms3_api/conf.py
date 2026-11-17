@@ -9,6 +9,8 @@ DEFAULTS = {
     "EXCLUDE_FIELDS": [],
     "MAX_PAGE_SIZE": 200,
     "DEFAULT_PAGE_SIZE": 50,
+    # Operations in one ``POST /batch/``
+    "MAX_BATCH_OPERATIONS": 100,
     # About one editing session; a new token for the next one
     "TOKEN_LIFETIME": dt.timedelta(hours=8),
     # Staged uploads: unused ones are removed by ``f3api_cleanup``

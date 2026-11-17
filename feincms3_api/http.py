@@ -27,6 +27,7 @@ class PluginIn(Schema):
 
 def build_router(api):
     router = Router(auth=api.auth, tags=["content"])
+    error_type = api.components.annotation("Error")
 
     @router.get("schema/", operation_id="schema")
     @_errors
@@ -46,6 +47,21 @@ def build_router(api):
         """Stage a file (multipart, field ``file``); name it in a write as
         ``{"upload": id}``"""
         return JsonResponse(api.upload(request, file), status=201)
+
+    @router.post(
+        "batch/",
+        operation_id="batch",
+        response={200: api.components.annotation("BatchResult")}
+        | dict.fromkeys((403, 404, 409, 412, 422, 428), error_type),
+    )
+    @_errors
+    def batch(
+        request,
+        payload: Body[api.components.annotation("Batch")],
+        dry_run: bool = False,
+    ):
+        """Several writes in one transaction, all of them or none"""
+        return api.batch(request, payload, dry_run=dry_run)
 
     for resource in api.resources:
         _add_routes(api, router, resource, api.components)

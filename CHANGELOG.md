@@ -2,6 +2,11 @@
 
 ## Next version
 
+- Added `POST /batch/` (`ContentAPI.batch()`): several writes in one
+  transaction, all or none, with one dry run for all of them;
+  `{"ref": name}` stands for the id of an object created earlier in the
+  batch. `MAX_BATCH_OPERATIONS` limits its size. The write operations take
+  `created=`, a list collecting what they create.
 - The OpenAPI schema is typed: every route's body and response refers to
   components built from the types' JSON schemas (a superset, as a
   superuser sees them), with plugins as a `oneOf` by `type` per region, so

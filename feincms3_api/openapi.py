@@ -228,6 +228,48 @@ class Components:
 
         for resource in api.resources:
             self.add_resource(builders, add_fields, request, resource)
+
+        names = [component_name(resource.type) for resource in api.resources]
+        builders["Ref"] = lambda ref: {
+            "type": "object",
+            "description": "The id of the object created earlier in the batch"
+            " with this `ref`",
+            "properties": {"ref": {"type": "string"}},
+            "required": ["ref"],
+            "additionalProperties": False,
+        }
+        builders["Batch"] = lambda ref: {
+            "type": "object",
+            "description": 'Run in order, in one transaction. `{"ref": name}`'
+            " stands for the id of an object created earlier in the batch,"
+            " wherever an id goes (also in `fields`).",
+            "properties": {
+                "operations": {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [ref(f"{name}BatchOperation") for name in names]
+                    },
+                }
+            },
+            "required": ["operations"],
+        }
+        builders["BatchResult"] = lambda ref: {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "description": "What each operation returns, `null` for deletions",
+                    "items": {"type": ["object", "null"]},
+                },
+                "refs": {
+                    "type": "object",
+                    "description": "The ids of the objects with a `ref`, `null`"
+                    " in a dry run",
+                    "additionalProperties": {"type": ["integer", "string", "null"]},
+                },
+            },
+            "required": ["results", "refs"],
+        }
         return builders
 
     def add_resource(self, builders, add_fields, request, resource):
@@ -329,6 +371,62 @@ class Components:
                 }
             return properties
 
+        def batch_operation(ref):
+            target = {
+                "resource": {"const": resource.name},
+                "id": {"oneOf": [pk_schema(resource.model), ref("Ref")]},
+                "etag": {
+                    "type": "string",
+                    "description": "Not needed for objects written earlier"
+                    " in the batch",
+                },
+            }
+
+            def operation(op, properties, required=()):
+                return {
+                    "type": "object",
+                    "properties": {"op": {"const": op}} | properties,
+                    "required": ["op", "resource", *required],
+                    "additionalProperties": False,
+                }
+
+            return {
+                "oneOf": [
+                    operation(
+                        "create",
+                        {
+                            "resource": target["resource"],
+                            "ref": {"type": "string"},
+                            **body(ref),
+                        },
+                    ),
+                    operation("update", target | body(ref), ["id"]),
+                    operation(
+                        "replace_content",
+                        target | {"content": ref(f"{name}Content")},
+                        ["id", "content"],
+                    ),
+                    operation(
+                        "update_plugin",
+                        target
+                        | {
+                            "plugin": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {"enum": list(plugins)},
+                                    "id": {"type": ["integer", "string"]},
+                                },
+                                "required": ["type", "id"],
+                            },
+                            "fields": {"type": "object"},
+                        },
+                        ["id", "plugin", "fields"],
+                    ),
+                    operation("delete", target, ["id"]),
+                ]
+            }
+
+        builders[f"{name}BatchOperation"] = batch_operation
         builders[name] = lambda ref: {
             "type": "object",
             "title": str(resource.model._meta.verbose_name),

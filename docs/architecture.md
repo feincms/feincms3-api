@@ -21,6 +21,7 @@ errors, ETags, dry runs, tokens and uploads.
 HTTP ──▶ http.py ──▶ ContentAPI (api.py)
           ninja       ├─ reading.py   list, detail, find, plugin
           routes      ├─ writing.py   create, update, update_plugin, delete, clear_cache, upload
+                      ├─ batch.py     several writes in one transaction
                       ├─ schema.py    /schema/, /schema/{type}/
                       └─ openapi.py   typed OpenAPI components
                               │
@@ -43,7 +44,7 @@ HTTP ──▶ http.py ──▶ ContentAPI (api.py)
   of `ContentAPI` and turn the result or an `APIError` into a response. No
   logic lives here.
 - **`api.py`**: `ContentAPI` holds the registered resources, the codec and
-  adapter registries and the auth classes, and is put together from three
+  adapter registries and the auth classes, and is put together from four
   mixins with the operations. The operations are plain methods taking a
   request and returning wire data, so management commands and other code
   can call them without HTTP, several of them in one transaction.
@@ -59,6 +60,9 @@ HTTP ──▶ http.py ──▶ ContentAPI (api.py)
   requested. The routes annotate their bodies and responses with them;
   the annotations validate a body only as an object (or as before, with the
   route's pydantic model), so validation stays with the operations.
+- **`batch.py`** runs a batch's operations in order through the other
+  operations, in one transaction, replacing `{"ref": name}` with the ids of
+  what the batch created; errors get the operation's index.
 - **`schema.py`** describes what's there: the resources, their region sets
   (page types, templates, form types), the plugins allowed per region, the
   other inlines, and each type's JSON schema.

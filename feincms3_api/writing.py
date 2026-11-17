@@ -66,28 +66,53 @@ class WritingMixin:
         if not resource.model_admin.has_change_permission(request, obj):
             raise ForbiddenError(f"No permission to change this {resource.type}.")
 
-    def create(self, request, name, payload, *, dry_run=False):
+    # ``created``, a list, collects ``(type, id)`` of what a write creates.
+
+    def create(self, request, name, payload, *, dry_run=False, created=None):
         """Create an object, with its content if ``payload`` has some"""
         resource = self.resource(name)
         if not resource.model_admin.has_add_permission(request):
             raise ForbiddenError(f"No permission to add {resource.type}.")
-        return self._write(request, resource, None, payload, dry_run=dry_run)
+        return self._write(
+            request, resource, None, payload, dry_run=dry_run, created=created
+        )
 
-    def update(self, request, name, pk, payload, *, if_match, dry_run=False):
+    def update(
+        self, request, name, pk, payload, *, if_match, dry_run=False, created=None
+    ):
         """Change an object's ``fields`` and the regions in its ``content``"""
         resource, obj = self._get(request, name, pk)
         self._check_change(request, resource, obj)
         self._check_etag(request, resource, obj, if_match)
-        return self._write(request, resource, obj, payload, dry_run=dry_run)
+        return self._write(
+            request, resource, obj, payload, dry_run=dry_run, created=created
+        )
 
-    def replace_content(self, request, name, pk, content, *, if_match, dry_run=False):
+    def replace_content(
+        self, request, name, pk, content, *, if_match, dry_run=False, created=None
+    ):
         """Replace the regions given in ``content``"""
         return self.update(
-            request, name, pk, {"content": content}, if_match=if_match, dry_run=dry_run
+            request,
+            name,
+            pk,
+            {"content": content},
+            if_match=if_match,
+            dry_run=dry_run,
+            created=created,
         )
 
     def _write(
-        self, request, resource, obj, payload, *, dry_run, plugin=None, read=None
+        self,
+        request,
+        resource,
+        obj,
+        payload,
+        *,
+        dry_run,
+        plugin=None,
+        read=None,
+        created=None,
     ):
         """
         Write as the admin's change view does: the object's form, the
@@ -111,10 +136,15 @@ class WritingMixin:
             )
             self._save(request, resource, form, target, bound, adding=adding)
             result = read(target) if read else resource.read(request, target, self)
+            new = created_objects(bound)
+            if adding:
+                new.append((resource.type, target.pk))
+            if created is not None:
+                created.extend(new)
             if dry_run:
                 transaction.set_rollback(True)
                 if read is None:
-                    _forget_ids(result, created_objects(bound), adding)
+                    forget_ids(result, new)
         return result
 
     def _validate(self, request, resource, obj, payload, *, plugin):
@@ -260,15 +290,26 @@ def _protected(exc):
     )
 
 
-def _forget_ids(wire, created, adding):
-    """A dry run's result: what was created has no id, it was rolled back"""
-    if adding:
-        wire["id"] = None
+def forget_ids(wire, created):
+    """
+    A dry run's result: what was created has no id, it was rolled back;
+    references to it in fields neither
+    """
     created = set(created)
-    for plugins in (wire.get("content") or {}).values():
-        for plugin in plugins:
-            if (plugin["type"], plugin["id"]) in created:
-                plugin["id"] = None
+
+    def forget(value):
+        if isinstance(value, dict):
+            if isinstance(value.get("id"), int | str) and (
+                (value.get("type"), value["id"]) in created
+            ):
+                value["id"] = None
+            for item in value.values():
+                forget(item)
+        elif isinstance(value, list):
+            for item in value:
+                forget(item)
+
+    forget(wire)
     for type_label, items in (wire.get("inlines") or {}).items():
         for item in items:
             if (type_label, item["id"]) in created:

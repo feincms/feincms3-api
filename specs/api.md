@@ -366,6 +366,7 @@ not the verbose name, which changes with the language):
 | `DELETE /{resource}/{id}/cache/` | delete the cached rendering, see below |
 | `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
+| `POST /batch/` | several writes in one transaction, see "Batches" |
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
 | `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
 
@@ -472,7 +473,7 @@ ancestors' old content until their own keys are deleted too.
 The endpoints are thin: under them are the operations, methods of
 `ContentAPI` taking a request (the admin's methods need one) and wire data
 (`list()`, `detail()`, `create()`, `update()`, `replace_content()`,
-`update_plugin()`, `delete()`, `clear_cache()`), which do the form handling, permission
+`update_plugin()`, `delete()`, `clear_cache()`, `batch()`), which do the form handling, permission
 checks, validation and logging. The ninja endpoints only parse the request,
 call one operation and map its result or errors to a response.
 
@@ -480,9 +481,48 @@ Two reasons: the logic is testable without HTTP, and work that spans many
 objects can run in one transaction in process. A subtree is many creates,
 and its dry run and its load should each be one `atomic()`; over HTTP that's
 many requests. Management commands (autotranslate, importers) call the
-operations directly; remote scripts and agents use HTTP and go object by
-object. Several writes in one transaction over HTTP are
-[#6](https://github.com/feincms/feincms3-api/issues/6).
+operations directly; over HTTP, `POST /batch/` does the same.
+
+### Batches
+
+`POST /batch/` runs several writes in one transaction, all of them or
+none, and `?dry_run=true` rolls all of them back:
+
+```json
+{"operations": [
+  {"op": "create", "resource": "pages", "ref": "section",
+   "fields": {"title": "Bereich", "parent": 3, …}},
+  {"op": "create", "resource": "pages",
+   "fields": {"parent": {"type": "pages.page", "id": {"ref": "section"}}, …},
+   "content": {"main": […]}},
+  {"op": "update", "resource": "pages", "id": {"ref": "section"},
+   "fields": {"is_active": true}},
+  {"op": "update", "resource": "pages", "id": 12, "etag": "…", "fields": {…}},
+  {"op": "replace_content", "resource": "pages", "id": 12, "content": {…}},
+  {"op": "update_plugin", "resource": "pages", "id": 12,
+   "plugin": {"type": "pages.button", "id": 7}, "fields": {…}},
+  {"op": "delete", "resource": "articles", "id": 3, "etag": "…"}
+]}
+```
+
+- Each operation is one of `ContentAPI`'s, named after it, with what its
+  route takes: `fields`, `content`, `inlines` as in the body, `etag` as
+  in `If-Match`. Each is checked and logged as if done on its own.
+- `{"ref": name}` stands for the id of the object created earlier in the
+  batch with that `ref`, wherever an id goes: an operation's `id`, a
+  reference in `fields` (`parent`), references inside plugins and JSON
+  data. A name not created earlier is an error.
+- Objects written earlier in the batch need no `etag`: nobody else can
+  have changed them since, and the ETag the client read is outdated.
+- The operations run in order and stop at the first which fails, since
+  later ones may depend on it. Errors carry the operation's index
+  (`"operation": 2`) and their paths start with it
+  (`operations[2].fields.title`); the status is the operation's.
+- The response has each operation's result (`null` for deletions) and the
+  ids of the refs, `{"results": […], "refs": {"section": 18}}`. In a dry
+  run, what the batch created has no id, as in a single write's dry run.
+- Uploads are staged before (`POST /uploads/`) and used as in single
+  writes. At most `MAX_BATCH_OPERATIONS` operations (100).
 
 ## Pages
 
@@ -625,6 +665,7 @@ FEINCMS3_API = {
     ],
     "DEFAULT_PAGE_SIZE": 50,
     "MAX_PAGE_SIZE": 200,
+    "MAX_BATCH_OPERATIONS": 100,
     "TOKEN_LIFETIME": timedelta(hours=8),
     "UPLOAD_LIFETIME": timedelta(days=1),
     "UPLOAD_STORAGE": "default",

@@ -13,6 +13,7 @@ from ninja import NinjaAPI
 
 from feincms3_api.adapters import AdapterRegistry
 from feincms3_api.auth import default_auth
+from feincms3_api.batch import BatchMixin
 from feincms3_api.codecs import codecs as default_codecs
 from feincms3_api.errors import NotFoundError
 from feincms3_api.reading import ReadingMixin
@@ -23,7 +24,7 @@ from feincms3_api.writing import WritingMixin
 _instances = []
 
 
-class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin):
+class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin, BatchMixin):
     def __init__(self, *, auth=None, codecs=None, adapters=None):
         self.auth = auth if auth is not None else default_auth()
         self.codecs = codecs or default_codecs.copy()
@@ -36,7 +37,11 @@ class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin):
     def register(self, resource):
         if "router" in self.__dict__:
             raise RuntimeError("Register resources before using the router.")
-        if resource.name in self._resources or resource.name in {"schema", "uploads"}:
+        if resource.name in self._resources or resource.name in {
+            "schema",
+            "uploads",
+            "batch",
+        }:
             raise ValueError(f"The resource name {resource.name!r} is taken.")
         self._resources[resource.name] = resource
         return resource
