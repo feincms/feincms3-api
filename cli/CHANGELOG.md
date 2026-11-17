@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.2 (2026-11-17)
+
 - The version follows feincms3-api's: 0.2 talks to feincms3-api 0.2.
 
 ## 0.0.2 (2026-11-17)
