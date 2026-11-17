@@ -369,9 +369,9 @@ not the verbose name, which changes with the language):
 
 | | |
 |---|---|
-| `GET /schema/` | resources, their types, regions per template/page type, allowed plugins per region, container plugins |
+| `GET /schema/` | resources (with their `filters` and whether `q` works, `search`), their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
-| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
+| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`; a `400` if it has none, rather than everything), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
 | `POST /{resource}/` | create, with or without `content` |
 | `GET /{resource}/{id}/` | one object with its content |
 | `PATCH /{resource}/{id}/` | change fields; `content` if given, see below |

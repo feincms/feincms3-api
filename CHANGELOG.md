@@ -2,6 +2,9 @@
 
 ## Next version
 
+- `?q=` on a resource whose admin has no `search_fields` is a `400`
+  instead of returning everything; `/schema/` lists each resource's
+  `filters` and whether it can be searched (`search`).
 - The token admin shows the access as radio buttons and the user as a raw
   id field; the token's name is optional.
 - Kinds: `link` and `*_link` are link names, feincms3's HTML plugin's `html`

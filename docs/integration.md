@@ -87,7 +87,10 @@ Every resource takes these arguments:
 - `filters=`: the fields lists can be filtered by, replacing the class's
   `filter_fields` (`language_code`, `is_active`, `translation_of` and
   `site`, where the model has them, plus `parent`, `page_type` and `path`
-  for trees and pages). `?q=` searches with the admin's `search_fields`.
+  for trees and pages). `?q=` searches with the admin's `search_fields`;
+  without them it's an error, so give the admins of resources clients look
+  for (pages!) `search_fields`. `/schema/` lists each resource's `filters`
+  and whether it can be searched (`search`).
 - `required_on_create=`: fields a create must give although the model has a
   default. `PageResource` requires `is_active`, so a client decides whether
   a new page is published.

@@ -18,7 +18,7 @@ from django.urls import NoReverseMatch, reverse
 
 from feincms3_api.adapters import Context
 from feincms3_api.codecs import label
-from feincms3_api.errors import ConflictError
+from feincms3_api.errors import APIError, ConflictError
 
 
 STRUCTURAL_FIELDS = frozenset({"region", "ordering", "depth"})
@@ -211,12 +211,26 @@ class Resource:
             else:
                 queryset = queryset.filter(**{name: value})
         if q := params.get("q"):
+            if not self.searchable(request):
+                raise APIError(
+                    f"{self.name} can't be searched: the admin of"
+                    f" {self.type} has no search_fields."
+                )
             queryset, duplicates = self.model_admin.get_search_results(
                 request, queryset, q
             )
             if duplicates:
                 queryset = queryset.distinct()
         return queryset
+
+    def filters(self):
+        """The filters lists take: ``filter_fields`` the model has"""
+        names = {field.name for field in self.model._meta.get_fields()}
+        return [name for name in self.filter_fields if name in names]
+
+    def searchable(self, request):
+        """Whether lists take ``q``: the admin's ``search_fields``"""
+        return bool(self.model_admin.get_search_fields(request))
 
     def get_object(self, request, pk):
         try:

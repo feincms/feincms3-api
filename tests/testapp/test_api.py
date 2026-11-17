@@ -131,6 +131,16 @@ class ReadTest(APITestCase):
         data = self.get("pages/", q="angeb").json()
         self.assertEqual([item["id"] for item in data["items"]], [self.angebot.pk])
 
+        # The admin of persons has no search_fields: an error, not everything
+        response = self.get("persons/", q="x")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("can't be searched", response.json()["detail"])
+        schema = {r["name"]: r for r in self.get("schema/").json()["resources"]}
+        self.assertEqual(schema["persons"]["search"], False)
+        self.assertEqual(schema["pages"]["search"], True)
+        self.assertIn("parent", schema["pages"]["filters"])
+        self.assertNotIn("parent", schema["persons"]["filters"])
+
         data = self.get("pages/", limit=1, offset=1).json()
         self.assertEqual(data["count"], 3)
         self.assertEqual(len(data["items"]), 1)

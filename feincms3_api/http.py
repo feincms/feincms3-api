@@ -100,7 +100,7 @@ def _add_routes(api, router, resource, components):
     @router.get(
         f"{name}/",
         operation_id=f"{operation}_list",
-        response=responses({200: list_type}),
+        response=responses({200: list_type}, 400),
     )
     @_errors
     def list_objects(request: HttpRequest):
