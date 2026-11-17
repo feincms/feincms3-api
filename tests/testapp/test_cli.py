@@ -3,12 +3,15 @@ import importlib
 import io
 import json
 import os
+import re
+import shlex
 import sys
 import tempfile
 import tomllib
 from pathlib import Path
 from unittest import mock
 
+import click
 from django.contrib.auth.models import User
 from django.test import LiveServerTestCase, SimpleTestCase, override_settings
 
@@ -18,6 +21,7 @@ from testapp.models import Button, Page
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cli"))
 
+from feincms3_api_cli import skills as cli_skills
 from feincms3_api_cli.config import prog
 from feincms3_api_cli.main import main
 
@@ -298,3 +302,109 @@ class ScriptsTest(SimpleTestCase):
         ]:
             with mock.patch.object(sys, "argv", [argv0]):
                 self.assertEqual(prog(), expected)
+
+
+def command_lines(text):
+    """
+    The ``f3api …`` command lines of a skill, in code blocks and inline
+    code, up to a pipe or a redirection
+    """
+    text = text.replace("\\\n", " ")
+    candidates = [
+        line.strip() for line in text.split("\n") if line.strip().startswith("f3api ")
+    ]
+    candidates += re.findall(r"`(f3api [^`]+)`", text)
+    for candidate in candidates:
+        args = []
+        for token in shlex.split(candidate, comments=True)[1:]:
+            if token[:1] in {"|", "<", ">", "&", ";"}:
+                break
+            args.append(token)
+        yield candidate, args
+
+
+def parses(args):
+    """Parse without running: the code is 0, or 2 with click's message"""
+    stderr = io.StringIO()
+    with (
+        mock.patch.object(click.Command, "invoke", lambda self, ctx: None),
+        contextlib.redirect_stderr(stderr),
+    ):
+        return main(args), stderr.getvalue()
+
+
+class SkillsTest(SimpleTestCase):
+    def setUp(self):
+        self.dirs = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dirs.cleanup)
+        self.root = Path(self.dirs.name)
+        env = mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(self.root)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def run_cli(self, *args):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = main(list(args))
+        return code, stdout.getvalue()
+
+    def test_install_list_uninstall(self):
+        shipped = self.root / "feincms3_api_cli" / "skills"
+        for name in ["one", "two"]:
+            (shipped / name).mkdir(parents=True)
+            (shipped / name / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: >\n  Skill\n  {name}\n---\n\nText\n"
+            )
+        target = self.root / "skills"
+        target.mkdir()
+        # A directory of its own and a link to a skill f3api doesn't have
+        (target / "two").mkdir()
+        (target / "gone").symlink_to(shipped / "gone")
+
+        with mock.patch.object(cli_skills, "SKILLS", shipped):
+            code, out = self.run_cli("skills", "install")
+            self.assertEqual(code, 0)
+            self.assertIn("Linked one.", out)
+            self.assertIn("left alone", out)
+            self.assertIn("Removed gone.", out)
+            self.assertEqual((target / "one").readlink(), shipped / "one")
+
+            code, out = self.run_cli("skills", "list")
+            self.assertEqual(
+                [(s["name"], s["state"], s["description"]) for s in json.loads(out)],
+                [
+                    ("one", "linked", "Skill one"),
+                    ("two", "a directory of its own", "Skill two"),
+                ],
+            )
+
+            code, out = self.run_cli("skills", "uninstall")
+            self.assertEqual(code, 0)
+            self.assertFalse((target / "one").exists())
+            self.assertTrue((target / "two").is_dir())
+
+    def test_project(self):
+        with mock.patch.object(Path, "cwd", return_value=self.root / "project"):
+            code, out = self.run_cli("skills", "list", "--project")
+        self.assertEqual(code, 0)
+        self.assertTrue(
+            all(skill["state"] == "not linked" for skill in json.loads(out))
+        )
+
+    def test_command_lines(self):
+        self.assertEqual(
+            list(command_lines("x `f3api get pages 1 --expand` y")),
+            [("f3api get pages 1 --expand", ["get", "pages", "1", "--expand"])],
+        )
+        self.assertEqual(parses(["get", "pages", "1", "--expand"])[0], 0)
+        self.assertEqual(parses(["get", "pages", "1", "--expanded"])[0], 2)
+
+    def test_skills_parse(self):
+        """A renamed option can't silently break a skill"""
+        for skill in cli_skills._skills():
+            text = (skill / "SKILL.md").read_text()
+            self.assertTrue(cli_skills.description(skill), skill)
+            for line, args in command_lines(text):
+                with self.subTest(skill=skill.name, line=line):
+                    code, err = parses(args)
+                    self.assertEqual(code, 0, err)

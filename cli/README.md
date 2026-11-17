@@ -71,6 +71,22 @@ f3api batch subtree.json --apply   # several writes in one transaction
 
 In a batch, operations without an `etag` get the one last read.
 
+## Skills
+
+The CLI brings [Claude Code](https://claude.com/claude-code) skills using
+`f3api`, and links them into Claude Code's skills:
+
+```bash
+f3api skills list                  # the skills and whether Claude Code has them
+f3api skills install               # link them into ~/.claude/skills
+f3api skills install --project     # … or into .claude/skills here
+f3api skills uninstall
+```
+
+The links point to where the CLI is installed, so upgrading it upgrades
+the skills; run `install` again when an upgrade brings new ones.
+`CLAUDE_CONFIG_DIR` moves `~/.claude`.
+
 ## Errors
 
 Errors go to stderr with their paths:

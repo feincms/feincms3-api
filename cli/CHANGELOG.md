@@ -5,6 +5,9 @@
 - Built on click and rich: `site list`, `resources` and `list` print
   tables in a terminal, JSON with `--json` or when the output isn't a
   terminal. `-h` works as `--help`.
+- `f3api skills list|install|uninstall`: Claude Code skills shipped with
+  the CLI, linked into `~/.claude/skills` (or `.claude/skills` with
+  `--project`).
 
 ## 0.2 (2026-11-17)
 

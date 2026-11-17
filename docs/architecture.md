@@ -142,6 +142,8 @@ fields and their kinds, for a snapshot test), `f3api_token`,
 (click for the commands, rich for tables and errors). Writes are dry runs unless `--apply`; it remembers
 the ETag of each object it read (`~/.cache/f3api/etags.json`) and sends
 that one, so a write fails rather than overwrite a change made since.
+Claude Code skills using it live in `cli/feincms3_api_cli/skills/<name>/`;
+`f3api skills install` links them into Claude Code's skills.
 
 ## Where a project plugs in
 
