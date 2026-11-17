@@ -34,7 +34,9 @@ class QueryCountTest(WriteTestCase):
         # The plugins are fetched once per inline for all pages, only the
         # hidden plugins are counted per page.
         one, three = (
-            self.count(lambda limit=limit: self.get(f"pages/?content=true&limit={limit}"))
+            self.count(
+                lambda limit=limit: self.get(f"pages/?content=true&limit={limit}")
+            )
             for limit in (1, 3)
         )
         self.assertEqual(one, REQUEST + 2 + PLUGIN_INLINES + 1)
