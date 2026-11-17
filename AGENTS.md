@@ -20,6 +20,9 @@
 - `docs/architecture.md`: how the code is organised, module by module, and
   where projects plug in. Keep it up to date when modules or their roles
   change.
+- `docs/integration.md`: integrating the API into a project. Keep it up to
+  date when settings, hooks, checks or the setup change, and add what
+  integrating real projects teaches (gates, deployment, kinds).
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
 - `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
   regenerate it with `.venv/bin/python tests/manage.py f3api_schema
