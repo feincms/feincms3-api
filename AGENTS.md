@@ -53,7 +53,9 @@
 
 - `.github/workflows/publish.yml` publishes on tags: `1.2.3` publishes
   feincms3-api, `cli-1.2.3` feincms3-api-cli (from `cli/`). The tag has to
-  match the package's `__version__`. Date the changelog's section and bump
-  the version in one commit; the maintainer pushes the tags.
+  match the package's `__version__` (`0.1` matches `0.1.0`).
+- The maintainer releases with `make-release` (in `cli/` for the CLI, which
+  has its own `CHANGELOG.md`): it dates the changelog, bumps the version,
+  commits, tags and pushes.
 - The README is the PyPI description: link to files in the repository with
   absolute GitHub URLs.

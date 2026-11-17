@@ -1,7 +1,7 @@
 name: Publish to PyPI
 
 # A tag `1.2.3` publishes feincms3-api, a tag `cli-1.2.3` feincms3-api-cli
-# (from `cli/`). The tag has to match the package's version.
+# (from `cli/`). The tag has to match the package's version (0.1 = 0.1.0).
 
 on:
   push:
@@ -28,10 +28,14 @@ jobs:
             python -m build
             version="$GITHUB_REF_NAME"
           fi
-          ls dist/*-"$version".tar.gz || {
-            echo "The tag doesn't match the package's version"
-            exit 1
-          }
+          python - "$version" <<'EOF'
+          import pathlib, sys
+          from packaging.version import Version
+          (sdist,) = pathlib.Path("dist").glob("*.tar.gz")
+          built = sdist.name.removesuffix(".tar.gz").rpartition("-")[2]
+          if Version(built) != Version(sys.argv[1]):
+              sys.exit(f"The tag says {sys.argv[1]}, the package {built}")
+          EOF
       - uses: actions/upload-artifact@v7
         with:
           name: dist
