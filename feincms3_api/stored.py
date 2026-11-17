@@ -25,8 +25,9 @@ class _Collector:
 @contextmanager
 def collecting(*, dry_run):
     """
-    Around a write's or batch's transaction: deletes the stored uploads if
-    it's a dry run or fails. Writes in a batch leave it to the batch.
+    Around a write's or batch's transaction: closes the uploads' files, and
+    deletes what they were stored as if it's a dry run or fails. Writes in
+    a batch leave it to the batch.
     """
     if _current.get() is not None:
         yield
@@ -39,6 +40,9 @@ def collecting(*, dry_run):
         saved = not dry_run
     finally:
         _current.reset(token)
+        # The staged files, opened for the forms
+        for upload in collector.uploads:
+            upload.close()
         if not saved:
             for storage, name in collector.stored:
                 storage.delete(name)

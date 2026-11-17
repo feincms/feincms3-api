@@ -55,7 +55,8 @@ class UploadTest(WriteTestCase):
         self.download.refresh_from_db()
         # Saved by the plugin's field, with its own upload_to
         self.assertTrue(self.download.file.name.startswith("downloads/liste"))
-        self.assertEqual(self.download.file.read(), b"%PDF-1.4 neu")
+        with self.download.file.open("rb") as f:
+            self.assertEqual(f.read(), b"%PDF-1.4 neu")
         self.assertEqual(
             response.json()["fields"]["file"]["name"], self.download.file.name
         )

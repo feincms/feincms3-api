@@ -8,6 +8,8 @@
   naming the resources, not the site's HTML 404 page.
 - Fixed: dry runs, and writes or batches which failed, left the copies of
   their uploads in the target fields' storage.
+- Fixed: the staged file of an upload stayed open after the write using
+  it (a `ResourceWarning`).
 
 ## 0.2 (2026-11-17)
 
