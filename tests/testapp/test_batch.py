@@ -1,6 +1,7 @@
 from django.contrib.admin.models import LogEntry
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 
+from feincms3_api.batch import _resolve
 from testapp.models import Button, Page, RichText
 from testapp.test_write import WriteTestCase
 
@@ -115,19 +116,26 @@ class BatchTest(WriteTestCase):
         response = self.batch(
             [
                 operation | {"etag": etag},
-                # The object changed in the batch, the ETag is still the one
-                # read before; written earlier, so no ETag is needed.
+                # Written earlier in the batch, so no ETag is needed; the
+                # one read before the batch is ignored.
                 {
                     "op": "replace_content",
                     "resource": "pages",
                     "id": self.angebot.pk,
                     "content": {"main": []},
                 },
+                {
+                    "op": "update",
+                    "resource": "pages",
+                    "id": self.angebot.pk,
+                    "etag": etag,
+                    "fields": {"title": "Neuer"},
+                },
             ]
         )
         self.assertEqual(response.status_code, 200, response.content)
         self.angebot.refresh_from_db()
-        self.assertEqual(self.angebot.title, "Neu")
+        self.assertEqual(self.angebot.title, "Neuer")
         self.assertFalse(RichText.objects.filter(parent=self.angebot).exists())
 
         response = self.batch([operation | {"etag": etag}])
@@ -175,6 +183,9 @@ class BatchTest(WriteTestCase):
                     "fields": {},
                 },
                 "delete",
+                {"op": [], "resource": "pages"},
+                {"op": "create", "resource": "pages", "ref": []},
+                {"op": "create", "resource": []},
             ]
         )
         self.assertEqual(response.status_code, 422)
@@ -187,6 +198,9 @@ class BatchTest(WriteTestCase):
                 "operations[3].ref",
                 "operations[4].plugin",
                 "operations[5]",
+                "operations[6].op",
+                "operations[7].ref",
+                "operations[8].resource",
             ],
         )
         self.assertEqual(self.send("post", "batch/", [1]).status_code, 422)
@@ -221,3 +235,30 @@ class BatchTest(WriteTestCase):
         response = self.batch(self.subtree())
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["errors"][0]["path"], "operations")
+
+
+class ResolveTest(SimpleTestCase):
+    def test_mappings_are_not_refs(self):
+        operation = {
+            "op": "update",
+            "resource": "invoices",
+            "id": {"ref": "a"},
+            "fields": {"ref": "INV-1"},
+        }
+        self.assertEqual(
+            _resolve(operation, {"a": 1}, "", mapping=True),
+            operation | {"id": 1},
+        )
+
+    def test_fields_named_ref(self):
+        operation = {
+            "op": "create",
+            "resource": "invoices",
+            "ref": "b",
+            "fields": {"ref": {"ref": "a"}},
+            "content": {"main": [{"type": "x", "fields": {"ref": "plain"}}]},
+        }
+        resolved = _resolve(operation, {"a": 1}, "", mapping=True)
+        self.assertEqual(resolved["ref"], "b")
+        self.assertEqual(resolved["fields"], {"ref": 1})
+        self.assertEqual(resolved["content"]["main"][0]["fields"], {"ref": "plain"})

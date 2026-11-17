@@ -519,9 +519,12 @@ none, and `?dry_run=true` rolls all of them back:
 - `{"ref": name}` stands for the id of the object created earlier in the
   batch with that `ref`, wherever an id goes: an operation's `id`, a
   reference in `fields` (`parent`), references inside plugins and JSON
-  data. A name not created earlier is an error.
-- Objects written earlier in the batch need no `etag`: nobody else can
-  have changed them since, and the ETag the client read is outdated.
+  data. A name not created earlier is an error. `fields` themselves are
+  never a reference, so a field called `ref` keeps its value; a value
+  `{"ref": "…"}` inside JSON data is one, though.
+- Objects written earlier in the batch need no `etag`, and a given one is
+  ignored: nobody else can have changed them since, and the ETag the client
+  read before the batch is outdated.
 - The operations run in order and stop at the first which fails, since
   later ones may depend on it. Errors carry the operation's index
   (`"operation": 2`) and their paths start with it

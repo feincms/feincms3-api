@@ -59,7 +59,7 @@ class BatchMixin:
         with transaction.atomic():
             for index, given in enumerate(operations):
                 try:
-                    operation = _resolve(given, refs, "")
+                    operation = _resolve(given, refs, "", mapping=True)
                     result = self._run(request, operation, written, created)
                 except APIError as exc:
                     raise BatchError(index, exc) from exc
@@ -85,10 +85,9 @@ class BatchMixin:
                 request, name, _body(operation, "create"), created=created
             )
         pk = operation["id"]
-        # What the batch wrote already can't have changed since
-        if_match = operation.get("etag") or (
-            "*" if (name, str(pk)) in written else None
-        )
+        # What the batch wrote already can't have changed since; an ETag
+        # given for it is the one from before the batch
+        if_match = "*" if (name, str(pk)) in written else operation.get("etag")
         if op == "update":
             return self.update(
                 request,
@@ -147,7 +146,7 @@ def _check(payload):
         if not isinstance(operation, dict):
             errors.append({"path": path, "message": "Expected an object."})
             continue
-        if (op := operation.get("op")) not in OPERATIONS:
+        if not isinstance(op := operation.get("op"), str) or op not in OPERATIONS:
             errors.append(
                 {
                     "path": f"{path}.op",
@@ -156,6 +155,8 @@ def _check(payload):
             )
             continue
         needed, optional = OPERATIONS[op]
+        if "resource" in operation and not isinstance(operation["resource"], str):
+            errors.append({"path": f"{path}.resource", "message": "Expected a name."})
         errors.extend(
             {"path": f"{path}.{key}", "message": "Missing."}
             for key in sorted(needed - set(operation))
@@ -171,7 +172,8 @@ def _check(payload):
                 errors.append(
                     {"path": f"{path}.ref", "message": "Used earlier in the batch."}
                 )
-            names.add(ref)
+            else:
+                names.add(ref)
         plugin = operation.get("plugin")
         if "plugin" in operation and not (
             isinstance(plugin, dict) and set(plugin) == {"type", "id"}
@@ -187,10 +189,15 @@ def _check(payload):
     return operations
 
 
-def _resolve(value, refs, path):
-    """``value`` with ``{"ref": name}`` replaced by the id of ``name``"""
+def _resolve(value, refs, path, *, mapping=False):
+    """
+    ``value`` with ``{"ref": name}`` replaced by the id of ``name``
+
+    ``mapping``: ``value`` is a mapping of names (an operation, its
+    ``fields``), not a value which may be a reference
+    """
     if isinstance(value, dict):
-        if set(value) == {"ref"} and isinstance(value["ref"], str):
+        if not mapping and set(value) == {"ref"} and isinstance(value["ref"], str):
             if value["ref"] not in refs:
                 raise ValidationFailedError(
                     [
@@ -203,7 +210,10 @@ def _resolve(value, refs, path):
                 )
             return refs[value["ref"]]
         return {
-            key: item if key == "ref" else _resolve(item, refs, _join(path, key))
+            # The operation's own ref is a name, not a reference
+            key: item
+            if key == "ref" and not path
+            else _resolve(item, refs, _join(path, key), mapping=key == "fields")
             for key, item in value.items()
         }
     if isinstance(value, list):
