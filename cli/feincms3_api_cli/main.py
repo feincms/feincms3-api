@@ -29,7 +29,7 @@ STATUS_EXIT = {
 }
 
 
-class Abort(Exception):
+class CommandError(Exception):
     def __init__(self, message, code=FAILED):
         super().__init__(message)
         self.code = code
@@ -46,7 +46,7 @@ def main(argv=None):
     except APIError as exc:
         print_error(exc)
         return STATUS_EXIT.get(exc.status, FAILED)
-    except Abort as exc:
+    except CommandError as exc:
         print(f"f3api: {exc}", file=sys.stderr)
         return exc.code
 
@@ -77,14 +77,16 @@ def read_json(path):
         with open(path) as f:
             return json.load(f)
     except (OSError, ValueError) as exc:
-        raise Abort(f"Can't read JSON from {path or 'stdin'}: {exc}", USAGE) from exc
+        raise CommandError(
+            f"Can't read JSON from {path or 'stdin'}: {exc}", USAGE
+        ) from exc
 
 
 def connect(args):
     try:
         url, token = Sites().resolve(args.site)
     except LookupError as exc:
-        raise Abort(str(exc), USAGE) from exc
+        raise CommandError(str(exc), USAGE) from exc
     return Client(url, token), ETags(url)
 
 
@@ -116,14 +118,14 @@ def site_remove(args):
     try:
         Sites().remove(args.name)
     except KeyError as exc:
-        raise Abort(f"No site {args.name!r}.", USAGE) from exc
+        raise CommandError(f"No site {args.name!r}.", USAGE) from exc
 
 
 def site_default(args):
     try:
         Sites().set_default(args.name)
     except KeyError as exc:
-        raise Abort(f"No site {args.name!r}.", USAGE) from exc
+        raise CommandError(f"No site {args.name!r}.", USAGE) from exc
 
 
 # Reading ####################################################################
@@ -169,7 +171,7 @@ def list_objects(args):
 def _pair(value):
     key, sep, rest = value.partition("=")
     if not sep:
-        raise Abort(f"Expected key=value, not {value!r}.", USAGE)
+        raise CommandError(f"Expected key=value, not {value!r}.", USAGE)
     return key, rest
 
 
@@ -223,7 +225,7 @@ def _if_match(args, etags, resource, pk):
         return args.etag
     if etag := etags.get(resource, pk):
         return etag
-    raise Abort(
+    raise CommandError(
         f"No ETag for {resource}/{pk}: read it first (f3api get {resource} {pk}),"
         " or pass --etag or --force.",
         CONFLICT,
@@ -321,7 +323,7 @@ def upload(args):
     try:
         output(client.upload(args.file)[1])
     except OSError as exc:
-        raise Abort(f"Can't read {args.file}: {exc}", USAGE) from exc
+        raise CommandError(f"Can't read {args.file}: {exc}", USAGE) from exc
 
 
 def batch(args):
