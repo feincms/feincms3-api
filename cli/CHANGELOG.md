@@ -11,10 +11,12 @@
 - The `feincms3-translate` skill: translating pages and subtrees with
   `f3api`, as inactive copies in one batch.
 - The `feincms3-dummy-content` skill: a page per page type with every
-  plugin, text in the site's language and images from picsum.photos. It reads
-  the project's renderer for layouts where the code is at hand.
+  plugin, text in the site's language (written as Markdown, converted at
+  the end) and images from picsum.photos, built by a script it writes. It
+  reads the project's renderer for layouts where the code is at hand.
 - The `feincms3-review` skill: reviewing content and reporting what's
-  broken, missing or badly written.
+  broken, missing or badly written; links to the site's own host count as
+  internal ones.
 - An error answer which isn't JSON (a site's HTML 404 page) is shown as
   its status, reason and URL, not as its HTML.
 - Error answers are closed, no `ResourceWarning` on Python 3.14 and
