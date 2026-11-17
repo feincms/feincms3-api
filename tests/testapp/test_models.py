@@ -100,6 +100,22 @@ class FormsTest(WriteTestCase):
         self.assertEqual(response.status_code, 200, response.content)
         select.refresh_from_db()
         self.assertEqual((select.label, select.type), ("Worum geht es?", "select"))
+        meta = response.json()["meta"]
+        self.assertEqual(meta["etag"], response["ETag"])
+        self.assertEqual(meta["warnings"], data["meta"]["warnings"])
+
+        # The response tells what the change left to fix
+        response = self.send(
+            "patch",
+            f"{path}plugins/testapp.simplefield_select/{select.pk}/",
+            {"fields": {"name": "name"}},
+            etag=response["ETag"],
+            dry_run="true",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        warnings = response.json()["meta"]["warnings"]
+        self.assertEqual(len(warnings), 2)
+        self.assertIn("'name' (2)", warnings[0]["message"])
 
     def test_validation(self):
         data = self.create_form()

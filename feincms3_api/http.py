@@ -150,7 +150,7 @@ def _add_routes(api, router, resource):
         dry_run: bool = False,
     ):
         """Change one plugin's fields; needs the object's ETag"""
-        wire, etag = api.update_plugin(
+        wire = api.update_plugin(
             request,
             name,
             pk,
@@ -160,9 +160,7 @@ def _add_routes(api, router, resource):
             if_match=request.headers.get("If-Match"),
             dry_run=dry_run,
         )
-        response = JsonResponse(wire)
-        response["ETag"] = etag
-        return response
+        return _json(wire)
 
     @router.delete(f"{name}/{{pk}}/", operation_id=f"{operation}_delete")
     @_errors

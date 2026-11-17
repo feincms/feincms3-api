@@ -2,6 +2,8 @@
 
 ## Next version
 
+- The plugin `PATCH` returns the object's `meta.warnings` and `etag` in the
+  plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
 - feincms3-data is only installed with the new `autotranslate` extra, which
   the incubator's autotranslate needs.
 - Documented the setup in the README, and the code's structure in

@@ -232,7 +232,9 @@ One object, as `GET /content/pages/17/` returns it:
   a resource adds its own in `Resource.check(request, obj)`;
   `ConfiguredFormResource` adds the feincms3-forms form type's validation,
   which the admin shows as messages. Every read has them, so a write's
-  response (dry runs included) tells what the change left to fix.
+  response (dry runs included) tells what the change left to fix. The
+  plugin `PATCH` returns the plugin with the object's `etag` and `warnings`
+  in its `meta`.
 - **References** are `{"type", "id"}` objects on read; on write a bare id is
   accepted where the field has one target model. References inside
   django-json-schema-editor data (`format: foreign_key`) stay bare ids, as

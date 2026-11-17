@@ -182,7 +182,10 @@ class WritingMixin:
         if_match,
         dry_run=False,
     ):
-        """Change one plugin's ``fields``; returns ``(plugin, object's ETag)``"""
+        """
+        Change one plugin's ``fields``; returns the plugin, with the object's
+        ``etag`` and ``warnings`` in its ``meta``
+        """
         resource, obj = self._get(request, name, pk)
         self._check_change(request, resource, obj)
         found = resource.get_plugin(request, obj, type_label, plugin_id)
@@ -196,10 +199,10 @@ class WritingMixin:
         self._check_etag(request, resource, obj, if_match)
 
         def read(target):
-            return (
-                resource.read_plugin(request, target, self, type_label, plugin.pk),
-                resource.read(request, target, self)["meta"]["etag"],
-            )
+            wire = resource.read_plugin(request, target, self, type_label, plugin.pk)
+            meta = resource.read(request, target, self)["meta"]
+            wire["meta"] = {"etag": meta["etag"], "warnings": meta["warnings"]}
+            return wire
 
         return self._write(
             request,
