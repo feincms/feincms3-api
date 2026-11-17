@@ -51,6 +51,12 @@ tags are allowed (`x-feincms3-html`).
 Skip page types which are applications (a second instance of an app is
 refused) unless the user asks for them, and say so.
 
+The schema doesn't say how plugins are combined on the page. If the
+project's code is at hand, read its renderer (`RegionRenderer`
+registrations: subregions, marks, plugins which group consecutive ones or
+set the layout of the plugins after them) and the page types (`TYPES`:
+which are applications), and build content which shows each layout.
+
 ## 3. Images and files
 
 For each image or file field (`{"upload": …}` in writes), upload a file
@@ -60,13 +66,14 @@ headers, square for teasers and people); a seed in the URL gives the same
 image each time:
 
 ```bash
-curl -sSfL -o header-1.jpg https://picsum.photos/seed/header-1/1600/900
+curl -sSfL --retry 3 --max-time 30 -o header-1.jpg https://picsum.photos/seed/header-1/1600/900
 f3api upload header-1.jpg          # prints {"upload": "…", "name": …}
 ```
 
 The API doesn't fetch URLs itself; download, then upload. Uploads are used
-once: upload one file per field. Other files (downloads): small text or
-PDF files you write. Cabinet files (`cabinet.file` references) are
+once: upload one file per field (a dry run doesn't use them up). Other
+files: a PDF or a short test video where a tool for it is at hand
+(ImageMagick, ffmpeg), else small files you write. Cabinet files (`cabinet.file` references) are
 created as objects of the `files` resource with their upload, then
 referenced by id; put them into one folder named like the dummy root.
 
@@ -90,7 +97,10 @@ content in every region:
 - **Choices**: valid values (`enum`); show different ones in different
   plugins.
 - **Links and references**: to other dummy pages (by `ref`) and to
-  existing pages, so link styles show.
+  existing pages, so link styles show. References to other objects
+  (projects, people, forms) go to existing ones; pick active ones
+  (`f3api list projects -f is_active=true --fields title`), since a field
+  may only accept those, which the schema doesn't show.
 - **Fields**: all required ones (`required` in the schema), and the
   optional ones filled too, so templates show them. Slugs from the title.
 - `is_active` as agreed; the same for all, so nothing dummy is active by
@@ -118,6 +128,11 @@ content in every region:
 
 A batch has at most 100 operations; split larger ones, the dummy root in
 the first.
+
+Rather than writing the JSON by hand, write a small script which builds
+it: the texts as Markdown, converted to HTML; downloads and uploads,
+caching the downloaded files so a second run only uploads; the batch file
+at the end. Keep it, to build the content again after changes.
 
 ## 5. Dry run, then apply
 
