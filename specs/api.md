@@ -310,8 +310,9 @@ button plugin with `button_label`, `button_url` and `button_page`. An
 adapter has `fields()`, `to_wire()`, `form_data()` (the current values with
 the wire values decoded over them) and `json_schema()`; a project registers
 one for a type (`content_api.adapters.register("pages.button", …)`) only to
-change the shape. Adapters which group or reshape fields are
-[#9](https://github.com/feincms/feincms3-api/issues/9).
+change the shape: grouping fields into one object, exposing a list or JSON
+stored in a `TextField` as such, hiding a value `save_model()` sets. No
+adapter beyond the default is built until a project needs one.
 
 **The snapshot.** `./manage.py f3api_schema [dotted.path.to.api]` prints
 every type with its fields and their kinds, as a superuser sees them, like
@@ -543,8 +544,9 @@ fields take uploads. Cabinet's own validation (exactly one file) applies.
   under the same id where the model has cabinet's `OverwriteMixin`.
 - `DELETE /files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
-- Listing the files nothing refers to is
-  [#1](https://github.com/feincms/feincms3-api/issues/1).
+- Listing unused files is left to cabinet: going by foreign keys, the API
+  can't tell an unused file from one whose URL is used elsewhere (in rich
+  text, a newsletter, another site).
 - Folders: a tree of `parent` and `name`; deleting a non-empty folder is
   refused.
 
@@ -651,8 +653,9 @@ of the package, no stability promise, may be removed.
   plugins to HTML, published-only). Possible later on the same codecs.
 - **Drafts, revisions, workflows.** See "Drafts".
 - **Rich text as Markdown** in the stored data: HTML is what's stored and
-  what the prose-editor field validates. Converting on the way in and out
-  is [#4](https://github.com/feincms/feincms3-api/issues/4).
+  what the prose-editor field validates. A project wanting Markdown uses a
+  plugin storing it, which the API handles like any other; converting
+  between HTML and Markdown on the way in and out is rejected.
 - **Copy and translate endpoints** (Wagtail has `copy_for_translation`).
   Translating is built on plain reads and creates, see "Translating".
 - **Generic CRUD for any model.** Only registered resources.

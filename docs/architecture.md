@@ -76,6 +76,12 @@ are. The default `FormAdapter` takes the admin form's fields and runs each
 through its codec: `to_wire()` for reading, `form_data()` for writing (the
 current values with the wire values decoded over them), `json_schema()` for
 the schema. Projects register an adapter per type only to change the shape.
+Codecs decide one field; an adapter decides a type's `fields` as a whole,
+which is where a project goes when the admin form is a poor wire shape:
+fields grouped into one object, a list or JSON stored in a `TextField`,
+fields a form builds in `__init__` from other data, or values set in
+`save_model()` that shouldn't be written directly. So far the default
+adapter covers every type; the registry is the seam for when it doesn't.
 
 **Codecs** (`codecs.py`) handle one form field: its wire value, how a wire
 value becomes form data, its JSON schema, and the references in it. They're
