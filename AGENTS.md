@@ -29,11 +29,6 @@
   own `pyproject.toml`, standard library only, talking HTTP. Its tests are
   `tests/testapp/test_cli.py` (against the live test server), so they run
   with the package's.
-- `feincms3_api/incubator/`: code which may become part of the package or go
-  away; tested, not documented as part of the package, no stability promise.
-  `incubator/autotranslate/` is feincms3-autotranslate, its app label stays
-  `feincms3_autotranslate`. Its docs are in `docs/autotranslate.md`; it
-  needs the `autotranslate` extra (feincms3-data).
 
 ## Conventions
 

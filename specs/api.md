@@ -11,8 +11,7 @@ importers and agents (e.g. Claude Code with a token and `curl`), next to the
 admin, not instead of it.
 
 It grows out of feincms3-autotranslate (see "Credits"): its content
-introspection is this package's core, and its translation pipeline lives in
-an incubator subpackage (see "Translating"). Ideas taken from it: explicit
+introspection is this package's core. Ideas taken from it: explicit
 allowlists, a committed snapshot of what's exposed, dry runs in a
 rolled-back transaction, errors as report lines instead of tracebacks.
 
@@ -489,7 +488,7 @@ call one operation and map its result or errors to a response.
 Two reasons: the logic is testable without HTTP, and work that spans many
 objects can run in one transaction in process. A subtree is many creates,
 and its dry run and its load should each be one `atomic()`; over HTTP that's
-many requests. Management commands (autotranslate, importers) call the
+many requests. Management commands (importers) call the
 operations directly; over HTTP, `POST /batch/` does the same.
 
 ### Batches
@@ -694,24 +693,19 @@ their model's type. The check looks at `ModelAdmin.inlines`, not at what
 
 ## Translating
 
-autotranslate (`feincms3_api.incubator.autotranslate`, docs in
-`docs/autotranslate.md`) copies content into another language: it dumps
-with feincms3-data, translates the strings with a file-based workflow or the
-Claude API, and loads the copies as inactive objects with its own loader. It
-stays in the incubator as it is for now.
+Translating needs nothing translation-specific beyond the kinds and the
+`translation_of` filter, so it's plain reads and a batch of creates, by a
+script or an agent ([docs/translating.md](../docs/translating.md)): read
+the source, translate the strings the schema marks `text` and `html`, keep
+`machine` and `choices` values' keys, map links and references to their
+counterparts in the target language (`translation_of`, `pages/find/`),
+then create the copies inactive with `translation_of` set, in one
+`POST /batch/` with a dry run first. The copies get the admin's
+validation, permissions and history like any other change.
 
-The goal is autotranslate acting through the API: reading the source in
-the wire format and creating the copies through the operations, so they get
-the admin's validation, permissions and history like any other change
-([#7](https://github.com/feincms/feincms3-api/issues/7)). Over HTTP,
-translating needs nothing translation-specific beyond the `translation_of`
-filter and the kinds: read the source page, translate the strings the
-schema marks `text` and `html`, keep `machine`, map links and references
-through `translation_of` and `pages/find/`, then create the copy inactive
-with `translation_of` set, a dry run first.
-
-**Incubator** means: in the repository and tested, not documented as part
-of the package, no stability promise, may be removed.
+feincms3-autotranslate's pipeline (dumping with feincms3-data, its own
+loader, a file-based review workflow) was in an incubator subpackage for a
+while and is gone: it bypassed the admin which the API goes through.
 
 ## Out of scope and rejected alternatives
 

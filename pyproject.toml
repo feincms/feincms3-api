@@ -34,12 +34,6 @@ dependencies = [
   "django-ninja>=1.4",
   "feincms3>=7.1",
 ]
-optional-dependencies.anthropic = [
-  "anthropic>=0.70",
-]
-optional-dependencies.autotranslate = [
-  "feincms3-data>=0.11",
-]
 optional-dependencies.tests = [
   "coverage",
   "django-cabinet",
@@ -114,9 +108,6 @@ lint.per-file-ignores."feincms3_api/http.py" = [
   # django-ninja takes query parameters as function parameters
   "FBT001",
   "FBT002",
-]
-lint.per-file-ignores."feincms3_api/incubator/*" = [
-  "N818",
 ]
 lint.per-file-ignores."tests/*" = [
   # assertIs(value, True)

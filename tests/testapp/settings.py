@@ -24,9 +24,7 @@ INSTALLED_APPS = [
     "django_prose_editor",
     "django_json_schema_editor",
     "feincms3_forms",
-    "feincms3_data",
     "feincms3_api",
-    "feincms3_api.incubator.autotranslate",
     "testapp",
     "feincms3_sites",
     "sitesapp",
@@ -64,15 +62,6 @@ SITES = {
     "it": {"host": "example.it"},
 }
 
-FEINCMS3_DATA_DATASETS = "testapp.datasets.datasets"
-FEINCMS3_AUTOTRANSLATE = {
-    "GLOSSARY": BASE_DIR / "glossary.toml",
-    "INSTRUCTIONS": "Formal register.",
-    "EXCLUDE_FIELDS": [
-        "testapp.form.recipient_email",
-        "testapp.jsonplugin_key_figures.data.figures[].unit",
-    ],
-}
 FEINCMS3_API = {
     "EXCLUDE_FIELDS": [
         "testapp.training.slug",

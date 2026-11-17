@@ -1,4 +1,0 @@
-keep = ["Acme"]
-
-[de.fr]
-Vorsorge = "prévoyance"

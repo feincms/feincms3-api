@@ -165,10 +165,3 @@ cabinet, feincms3-forms, a tree without paths and a model with ordinary
 inlines; `tests/sitesapp` and `tests/langapp` are feincms3-sites and
 feincms3-language-sites. `tests/testapp/snapshot.txt` is the schema
 snapshot, regenerated with `f3api_schema` and reviewed as a diff.
-
-## The incubator
-
-`feincms3_api/incubator/autotranslate` is feincms3-autotranslate as it was
-moved here: tested, not part of the documented package, no stability
-promise. It should end up on the API's operations
-([#7](https://github.com/feincms/feincms3-api/issues/7)).

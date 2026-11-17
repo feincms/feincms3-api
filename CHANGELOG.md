@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Removed the incubator's autotranslate (and the `autotranslate` and
+  `anthropic` extras): translating is done over the API, see
+  `docs/translating.md`. Remove `feincms3_api.incubator.autotranslate`
+  from `INSTALLED_APPS`.
 - Added `feincms3-api-cli` (`cli/`, command `f3api`), a separate package:
   the API from the command line, with dry runs unless `--apply`, the ETags
   of what was read sent automatically, and errors with their paths.
@@ -32,8 +36,6 @@
   plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
 - A system check (`feincms3_api.E003`) reports a registered model's admin
   with two inlines for the same model, which the API can't tell apart.
-- feincms3-data is only installed with the new `autotranslate` extra, which
-  the incubator's autotranslate needs.
 - Documented the setup in the README, and the code's structure in
   `docs/architecture.md`.
 

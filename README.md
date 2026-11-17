@@ -24,6 +24,7 @@ any code for the API.
 - [Issues](https://github.com/feincms/feincms3-api/issues): what's planned.
 - [feincms3-api-cli](cli/README.md): the API from the command line
   (`f3api`), for people and agents with a shell.
+- [Translating](docs/translating.md) content over the API.
 
 ## Setup
 
@@ -137,16 +138,6 @@ writing files) happens in a dry run too.
 Files are uploaded first (`POST /uploads/`, multipart) and then named in a
 write as `{"upload": "<id>"}`. Changes appear in the admin's history,
 marked "(Through the API.)".
-
-## Incubator
-
-`feincms3_api.incubator` holds code which may become part of the package or
-may go away: tested, but not documented as part of the package, and without
-any promise of stability. At the moment that's
-`feincms3_api.incubator.autotranslate`, which machine-translates feincms3
-content and loads it as inactive copies, see
-[docs/autotranslate.md](docs/autotranslate.md). It needs the
-`autotranslate` extra.
 
 ## Credits
 
