@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Added `feincms3-api-cli` (`cli/`, command `f3api`), a separate package:
+  the API from the command line, with dry runs unless `--apply`, the ETags
+  of what was read sent automatically, and errors with their paths.
 - The schema of a django-prose-editor field with `extensions` says which
   markup it allows (`x-feincms3-html`: tags, attributes, URL schemes) and
   whether the field sanitises the rest away.

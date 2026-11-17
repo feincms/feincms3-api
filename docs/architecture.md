@@ -138,6 +138,11 @@ which don't exist.
 fields and their kinds, for a snapshot test), `f3api_token`,
 `f3api_cleanup` (expired uploads and tokens).
 
+**The CLI** (`cli/`, its own package): `f3api` talks HTTP with a token,
+standard library only. Writes are dry runs unless `--apply`; it remembers
+the ETag of each object it read (`~/.cache/f3api/etags.json`) and sends
+that one, so a write fails rather than overwrite a change made since.
+
 ## Where a project plugs in
 
 | To | Use |

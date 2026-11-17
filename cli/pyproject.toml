@@ -1,0 +1,35 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "feincms3-api-cli"
+description = "The feincms3 content API from the command line"
+readme = "README.md"
+license = "BSD-3-Clause"
+authors = [
+  { name = "Feinheit AG", email = "dev@feinheit.ch" },
+  { name = "Matthias Kestenholz", email = "mk@feinheit.ch" },
+]
+requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+]
+dynamic = [ "version" ]
+dependencies = []
+urls.Homepage = "https://github.com/feincms/feincms3-api/"
+scripts.f3api = "feincms3_api_cli.main:main_exit"
+
+[tool.hatch]
+version.path = "feincms3_api_cli/__init__.py"
+build.include = [ "feincms3_api_cli/" ]

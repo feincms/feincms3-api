@@ -19,3 +19,4 @@ venv
 .tox
 .venv
 /tests/media
+/tests/testapp/media

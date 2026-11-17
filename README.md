@@ -22,6 +22,8 @@ any code for the API.
   plugs in.
 - [The spec](specs/api.md): the design and the reasoning behind it.
 - [Issues](https://github.com/feincms/feincms3-api/issues): what's planned.
+- [feincms3-api-cli](cli/README.md): the API from the command line
+  (`f3api`), for people and agents with a shell.
 
 ## Setup
 
