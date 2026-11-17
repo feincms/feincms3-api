@@ -8,6 +8,8 @@
 - `f3api skills list|install|uninstall`: Claude Code skills shipped with
   the CLI, linked into `~/.claude/skills` (or `.claude/skills` with
   `--project`).
+- The `feincms3-translate` skill: translating pages and subtrees with
+  `f3api`, as inactive copies in one batch.
 
 ## 0.2 (2026-11-17)
 

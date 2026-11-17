@@ -5,6 +5,11 @@ needs no translation endpoint: it's reads, the schema's kinds, and one batch
 of creates. A script or an agent with the [CLI](../cli/README.md) (or
 `curl`) does it like this; the examples use `f3api`, German to French.
 
+With Claude Code, the CLI's `feincms3-translate` skill does these steps
+(`f3api skills install`, see the [CLI's README](../cli/README.md#skills)):
+selecting a subtree, skipping what's translated already, a glossary,
+objects with a region per language, and a report for the editors.
+
 ## 1. Read the source and the schema
 
 ```bash

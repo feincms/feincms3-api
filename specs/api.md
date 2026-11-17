@@ -718,6 +718,8 @@ counterparts in the target language (`translation_of`, `pages/find/`),
 then create the copies inactive with `translation_of` set, in one
 `POST /batch/` with a dry run first. The copies get the admin's
 validation, permissions and history like any other change.
+The CLI ships this as a Claude Code skill (`feincms3-translate`,
+`f3api skills install`).
 
 feincms3-autotranslate's pipeline (dumping with feincms3-data, its own
 loader, a file-based review workflow) was in an incubator subpackage for a

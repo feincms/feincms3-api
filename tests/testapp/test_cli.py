@@ -35,6 +35,9 @@ class Terminal(io.StringIO):
 
 
 class CLITest(LiveServerTestCase):
+    # The translate skill's example uses fixed ids
+    reset_sequences = True
+
     def setUp(self):
         user = User.objects.create_superuser("admin", "", "admin")
         _token, self.secret = APIToken.objects.create_token(
@@ -282,6 +285,38 @@ class CLITest(LiveServerTestCase):
                 [plugin["type"] for plugin in data["content"]["main"]],
                 ["testapp.richtext"],
             )
+
+    def test_translate_skill_batch_example(self):
+        """The skill's batch example passes a dry run"""
+        text = (
+            CLI / "feincms3_api_cli" / "skills" / "feincms3-translate" / "SKILL.md"
+        ).read_text()
+        example = re.search(r"```json\n(.*?)```", text, re.DOTALL)[1]
+        # The test app's types are testapp.*, not pages.*
+        example = example.replace('"pages.', '"testapp.')
+
+        def page(pk, slug, **kwargs):
+            return Page.objects.create(
+                pk=pk,
+                title=slug,
+                slug=slug,
+                page_type="standard",
+                is_active=True,
+                **kwargs,
+            )
+
+        fr = page(5, "fr", language_code="fr", translation_of=self.home)
+        angebot = page(17, "angebot", parent=self.home, language_code="de")
+        page(18, "kurse", parent=angebot, language_code="de")
+        kontakt = page(44, "kontakt", parent=self.home, language_code="de")
+        page(45, "contact", parent=fr, language_code="fr", translation_of=kontakt)
+
+        path = Path(self.dirs.name) / "translation.json"
+        path.write_text(example)
+        code, data, err = self.run_cli("batch", path)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(len(data["results"]), 2)
+        self.assertFalse(Page.objects.filter(slug="offre").exists())
 
 
 class ScriptsTest(SimpleTestCase):
