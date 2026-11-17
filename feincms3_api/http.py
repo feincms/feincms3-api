@@ -4,9 +4,10 @@ import functools
 from typing import Any
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from ninja import File, Router, Schema, UploadedFile
+from ninja import Body, File, Router, Schema, UploadedFile
 
 from feincms3_api.errors import APIError
+from feincms3_api.openapi import component_name
 from feincms3_api.reading import _bool, expands_references
 
 
@@ -47,29 +48,54 @@ def build_router(api):
         return JsonResponse(api.upload(request, file), status=201)
 
     for resource in api.resources:
-        _add_routes(api, router, resource)
+        _add_routes(api, router, resource, api.components)
     return router
 
 
-def _add_routes(api, router, resource):
+def _add_routes(api, router, resource, components):
     name = resource.name
     operation = name.replace("-", "_")
+    component = component_name(resource.type)
+    read_type = components.annotation(component)
+    list_type = components.annotation(f"{component}List")
+    plugin_type = components.annotation(f"{component}Plugin")
+    write_type = components.annotation(f"{component}Write", ObjectIn)
+    content_write_type = components.annotation(f"{component}ContentWrite", ContentIn)
+    plugin_write_type = components.annotation("PluginWrite", PluginIn)
+    error_type = components.annotation("Error")
+
+    def responses(ok, *errors):
+        return ok | dict.fromkeys((403, 404, *errors), error_type)
+
+    writes = (409, 412, 422, 428)
 
     if resource.findable:
         # Before {pk}/, which would take "find" for an id
-        @router.get(f"{name}/find/", operation_id=f"{operation}_find")
+        @router.get(
+            f"{name}/find/",
+            operation_id=f"{operation}_find",
+            response=responses({200: read_type}, 409),
+        )
         @_errors
         def find(request: HttpRequest):
             """One object by its ``path``"""
             return _json(api.find(request, name, request.GET))
 
-    @router.get(f"{name}/", operation_id=f"{operation}_list")
+    @router.get(
+        f"{name}/",
+        operation_id=f"{operation}_list",
+        response=responses({200: list_type}),
+    )
     @_errors
     def list_objects(request: HttpRequest):
         """List: ``limit``, ``offset``, ``q``, filters, ``content``, ``fields``"""
         return api.list(request, name, request.GET)
 
-    @router.get(f"{name}/{{pk}}/", operation_id=f"{operation}_detail")
+    @router.get(
+        f"{name}/{{pk}}/",
+        operation_id=f"{operation}_detail",
+        response=responses({200: read_type}),
+    )
     @_errors
     def detail(request, pk: str, response: HttpResponse):
         """One object with its content; ``nested=true`` for a tree"""
@@ -86,6 +112,7 @@ def _add_routes(api, router, resource):
     @router.get(
         f"{name}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
         operation_id=f"{operation}_plugin",
+        response=responses({200: plugin_type}),
     )
     @_errors
     def plugin(request, pk: str, type_label: str, plugin_id: str):
@@ -99,38 +126,50 @@ def _add_routes(api, router, resource):
             expand=expands_references(request.GET),
         )
 
-    @router.post(f"{name}/", operation_id=f"{operation}_create")
+    @router.post(
+        f"{name}/",
+        operation_id=f"{operation}_create",
+        response=responses({200: read_type, 201: read_type}, 422),
+    )
     @_errors
-    def create(request, payload: ObjectIn, dry_run: bool = False):
+    def create(request, payload: Body[write_type], dry_run: bool = False):
         """Create an object, with its content if given"""
-        wire = api.create(
-            request, name, payload.model_dump(exclude_unset=True), dry_run=dry_run
-        )
+        wire = api.create(request, name, payload, dry_run=dry_run)
         return _json(wire, 200 if dry_run else 201)
 
-    @router.patch(f"{name}/{{pk}}/", operation_id=f"{operation}_update")
+    @router.patch(
+        f"{name}/{{pk}}/",
+        operation_id=f"{operation}_update",
+        response=responses({200: read_type}, *writes),
+    )
     @_errors
-    def update(request, pk: str, payload: ObjectIn, dry_run: bool = False):
+    def update(request, pk: str, payload: Body[write_type], dry_run: bool = False):
         """Change fields, and replace the regions given in ``content``"""
         wire = api.update(
             request,
             name,
             pk,
-            payload.model_dump(exclude_unset=True),
+            payload,
             if_match=request.headers.get("If-Match"),
             dry_run=dry_run,
         )
         return _json(wire)
 
-    @router.put(f"{name}/{{pk}}/content/", operation_id=f"{operation}_content")
+    @router.put(
+        f"{name}/{{pk}}/content/",
+        operation_id=f"{operation}_content",
+        response=responses({200: read_type}, *writes),
+    )
     @_errors
-    def replace_content(request, pk: str, payload: ContentIn, dry_run: bool = False):
+    def replace_content(
+        request, pk: str, payload: Body[content_write_type], dry_run: bool = False
+    ):
         """Replace the regions given; the others are left alone"""
         wire = api.replace_content(
             request,
             name,
             pk,
-            payload.content,
+            payload["content"],
             if_match=request.headers.get("If-Match"),
             dry_run=dry_run,
         )
@@ -139,6 +178,7 @@ def _add_routes(api, router, resource):
     @router.patch(
         f"{name}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
         operation_id=f"{operation}_plugin_update",
+        response=responses({200: plugin_type}, *writes),
     )
     @_errors
     def update_plugin(
@@ -146,7 +186,7 @@ def _add_routes(api, router, resource):
         pk: str,
         type_label: str,
         plugin_id: str,
-        payload: PluginIn,
+        payload: Body[plugin_write_type],
         dry_run: bool = False,
     ):
         """Change one plugin's fields; needs the object's ETag"""
@@ -156,13 +196,17 @@ def _add_routes(api, router, resource):
             pk,
             type_label,
             plugin_id,
-            payload.model_dump(),
+            payload,
             if_match=request.headers.get("If-Match"),
             dry_run=dry_run,
         )
         return _json(wire)
 
-    @router.delete(f"{name}/{{pk}}/", operation_id=f"{operation}_delete")
+    @router.delete(
+        f"{name}/{{pk}}/",
+        operation_id=f"{operation}_delete",
+        response=responses({204: None}, *writes),
+    )
     @_errors
     def delete(request, pk: str, dry_run: bool = False):
         """Delete an object"""
@@ -175,7 +219,11 @@ def _add_routes(api, router, resource):
         )
         return HttpResponse(status=204)
 
-    @router.delete(f"{name}/{{pk}}/cache/", operation_id=f"{operation}_cache_clear")
+    @router.delete(
+        f"{name}/{{pk}}/cache/",
+        operation_id=f"{operation}_cache_clear",
+        response=responses({204: None}),
+    )
     @_errors
     def clear_cache(request, pk: str):
         """Delete the cached rendering, to see changes on the site at once"""

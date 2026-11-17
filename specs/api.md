@@ -369,6 +369,23 @@ not the verbose name, which changes with the language):
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
 | `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
 
+**OpenAPI.** Next to `/schema/`, the OpenAPI schema types every route for
+generated clients: a component per type (`TestappPage`, its `…Fields`,
+`…Write`, `…List`, `…Content`, a component per plugin and inline type, the
+plugins of a resource as a `oneOf` by `type` per region), and `Error` for
+the error responses. The components are built from the same JSON schemas
+as `/schema/{type}/`, as a superuser sees them, when the OpenAPI schema is
+first requested (per language, since titles are translated), not at
+startup. So they're a superset of what a user sees: the admin's per-user
+hooks (`get_fields()`, `get_readonly_fields()`, …) and inline permissions
+can hide or lock fields, and choices may be limited per user or site. We
+assume users with access to a model and its inlines are trusted with all
+of its fields; where they aren't, a write's `422` says so, and
+`/schema/{type}/` is exact for each user. The routes' bodies are still
+validated by the operations only, not by the components, so errors keep
+their paths. One component per plugin serves reading and writing: `id` is
+left out for new plugins, read-only fields are `readOnly`.
+
 Lists return `{"count", "items"}`, items without `content` unless
 `?content=true`. List filters are declared on the resource (`filters=`),
 not taken from the admin's `list_filter`: its entries can be arbitrary

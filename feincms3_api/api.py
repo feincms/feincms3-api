@@ -52,6 +52,13 @@ class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin):
             raise NotFoundError(f"No resource {name!r}.") from exc
 
     @cached_property
+    def components(self):
+        """The OpenAPI schema's components, built when first requested"""
+        from feincms3_api.openapi import Components  # noqa: PLC0415
+
+        return Components(self)
+
+    @cached_property
     def router(self):
         from feincms3_api.http import build_router  # noqa: PLC0415
 

@@ -2,6 +2,11 @@
 
 ## Next version
 
+- The OpenAPI schema is typed: every route's body and response refers to
+  components built from the types' JSON schemas (a superset, as a
+  superuser sees them), with plugins as a `oneOf` by `type` per region, so
+  generated clients get real types. They are built when the schema is
+  first requested, not at startup.
 - Creating a page needs `is_active`: feincms3 defaults to active, so a
   client has to decide. Resources list such fields in `required_on_create`
   (also an argument), which the type's schema marks as `required`.

@@ -21,7 +21,8 @@ errors, ETags, dry runs, tokens and uploads.
 HTTP ──▶ http.py ──▶ ContentAPI (api.py)
           ninja       ├─ reading.py   list, detail, find, plugin
           routes      ├─ writing.py   create, update, update_plugin, delete, clear_cache, upload
-                      └─ schema.py    /schema/, /schema/{type}/
+                      ├─ schema.py    /schema/, /schema/{type}/
+                      └─ openapi.py   typed OpenAPI components
                               │
                               ▼
                       Resource (resources.py)        what the admin says
@@ -53,6 +54,11 @@ HTTP ──▶ http.py ──▶ ContentAPI (api.py)
   everything and collect every error with its path, then `save_form()`,
   `save_model()`, `save_related()`, the change message and the history
   entry. One transaction per write; a dry run rolls it back.
+- **`openapi.py`** builds the OpenAPI schema's components from the types'
+  JSON schemas, as a superuser sees them, when the OpenAPI schema is first
+  requested. The routes annotate their bodies and responses with them;
+  the annotations validate a body only as an object (or as before, with the
+  route's pydantic model), so validation stays with the operations.
 - **`schema.py`** describes what's there: the resources, their region sets
   (page types, templates, form types), the plugins allowed per region, the
   other inlines, and each type's JSON schema.

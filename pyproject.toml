@@ -49,6 +49,7 @@ optional-dependencies.tests = [
   "feincms3-forms",
   "feincms3-language-sites",
   "feincms3-sites>=0.23",
+  "openapi-spec-validator",
 ]
 urls.Homepage = "https://github.com/feincms/feincms3-api/"
 

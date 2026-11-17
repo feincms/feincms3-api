@@ -73,14 +73,18 @@ class SchemaMixin:
     def type_schema(self, request, type_label):
         for type, context in self.contexts(request):
             if type == type_label:
-                schema = self.adapters.lookup(type).json_schema(context)
-                for resource in self.resources:
-                    if resource.type == type and (
-                        names := resource.required_fields(request, self)
-                    ):
-                        required = schema.setdefault("required", [])
-                        required.extend(n for n in names if n not in required)
-                return {"$schema": "https://json-schema.org/draft/2020-12/schema"} | (
-                    schema
-                )
+                return {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema"
+                } | self.fields_schema(request, type, context)
         raise NotFoundError(f"No type {type_label!r}.")
+
+    def fields_schema(self, request, type_label, context):
+        """The JSON schema of a type's ``fields``, from ``contexts()``"""
+        schema = self.adapters.lookup(type_label).json_schema(context)
+        for resource in self.resources:
+            if resource.type == type_label and (
+                names := resource.required_fields(request, self)
+            ):
+                required = schema.setdefault("required", [])
+                required.extend(n for n in names if n not in required)
+        return schema
