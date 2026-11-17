@@ -37,7 +37,8 @@
 
 - Formatting and linting: `ruff` and `pyproject-fmt` via `prek`
   (`prek install` once per checkout, `prek run --all-files`).
-- Add user-facing changes to the "Next version" section of `CHANGELOG.md`.
+- Add every change, small fixes too, to the "Next version" section of
+  `CHANGELOG.md` (`cli/CHANGELOG.md` for the CLI).
 
 ## Commits
 
