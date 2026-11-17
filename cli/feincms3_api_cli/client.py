@@ -68,12 +68,13 @@ class Client:
                 content = response.read()
                 status = response.status
         except urllib.error.HTTPError as exc:
-            if 300 <= exc.code < 400:
-                raise TransportError(
-                    f"{exc.code}: redirected to {exc.headers.get('Location')};"
-                    " use that URL for the site."
-                ) from None
-            content = exc.read()
+            with exc:
+                if 300 <= exc.code < 400:
+                    raise TransportError(
+                        f"{exc.code}: redirected to {exc.headers.get('Location')};"
+                        " use that URL for the site."
+                    ) from None
+                content = exc.read()
             try:
                 data = json.loads(content)
             except ValueError:
