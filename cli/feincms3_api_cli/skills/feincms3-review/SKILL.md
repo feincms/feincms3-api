@@ -76,8 +76,11 @@ Structure and references:
 - **Links to inactive pages**: references to and internal links to pages
   with `is_active: false`, from active pages
   (`f3api list pages -f is_active=false --fields title,path --limit 200`).
-- **Internal links** in `html` fields and `link` fields (`/de/…`): check
-  each path once with `f3api find /de/kontakt/`; a 404 is a broken link.
+- **Internal links** in `html` fields, `link` fields and JSON data: paths
+  (`/de/…`) and absolute URLs to the site's own host (the host of the
+  pages' `meta.url`). Check each path once with
+  `f3api find /de/kontakt/`; a 404 is a broken link. Links to files
+  (`/media/…`) are checked like external links.
 - **External links**: only if agreed (HEAD requests, slowly, each URL
   once).
 - **Warnings**: `meta.warnings` of each object (e.g. plugins in regions
