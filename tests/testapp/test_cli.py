@@ -190,6 +190,67 @@ class CLITest(LiveServerTestCase):
             with mock.patch.dict(os.environ, {"F3API_TOKEN": ""}):
                 code, data, err = self.run_cli("list", "pages")
             self.assertEqual(code, 0, err)
+            self.assertEqual(
+                (Path(self.dirs.name) / "config").stat().st_mode & 0o777, 0o700
+            )
+
+        # A site named with --site wins over F3API_URL and F3API_TOKEN
+        with mock.patch.dict(
+            os.environ, {"F3API_URL": "http://127.0.0.1:1/", "F3API_TOKEN": "x"}
+        ):
+            code, data, err = self.run_cli("--site", "here", "list", "pages")
+        self.assertEqual(code, 0, err)
+
+    def test_transport_errors(self):
+        with mock.patch.dict(os.environ, {"F3API_URL": "http://127.0.0.1:1/"}):
+            code, _data, err = self.run_cli("list", "pages")
+        self.assertEqual(code, 1)
+        self.assertIn("Can't connect", err)
+        # The admin redirects to its login: not followed
+        with mock.patch.dict(
+            os.environ, {"F3API_URL": f"{self.live_server_url}/admin/"}
+        ):
+            code, _data, err = self.run_cli("list", "pages")
+        self.assertEqual(code, 1)
+        self.assertIn("redirected to", err)
+
+    def test_batch_delete_ref(self):
+        operations = [
+            {
+                "op": "create",
+                "resource": "pages",
+                "ref": "a",
+                "fields": {
+                    "title": "Weg",
+                    "slug": "weg",
+                    "parent": self.home.pk,
+                    "page_type": "standard",
+                    "language_code": "de",
+                    "is_active": False,
+                },
+            },
+            {"op": "delete", "resource": "pages", "id": {"ref": "a"}},
+        ]
+        code, data, err = self.run_cli("batch", "--apply", stdin=json.dumps(operations))
+        self.assertEqual(code, 0, err)
+        self.assertFalse(Page.objects.filter(slug="weg").exists())
+        cache = json.loads((Path(self.dirs.name) / "cache" / "etags.json").read_text())
+        self.assertFalse(any(key.endswith(f"/{data['refs']['a']}") for key in cache))
+
+    def test_content_wrapped_or_not(self):
+        self.run_cli("get", "pages", self.home.pk)
+        regions = {
+            "main": [{"type": "testapp.richtext", "fields": {"text": "<p>A</p>"}}]
+        }
+        for body in [regions, {"content": regions}]:
+            code, data, err = self.run_cli(
+                "content", "pages", self.home.pk, stdin=json.dumps(body)
+            )
+            self.assertEqual(code, 0, err)
+            self.assertEqual(
+                [plugin["type"] for plugin in data["content"]["main"]],
+                ["testapp.richtext"],
+            )
 
 
 class ScriptsTest(SimpleTestCase):

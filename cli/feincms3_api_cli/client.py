@@ -2,11 +2,14 @@
 
 import json
 import mimetypes
-import os
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+
+
+class TransportError(Exception):
+    """No answer from the API: the connection failed, or it isn't the API"""
 
 
 class APIError(Exception):
@@ -36,12 +39,9 @@ class Client:
             headers["Content-Type"] = "application/json"
         return self._send(urllib.request.Request(url, data, headers, method=method))
 
-    def upload(self, path):
+    def upload(self, name, content):
         boundary = uuid.uuid4().hex
-        name = os.path.basename(path)
         content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
-        with open(path, "rb") as f:
-            content = f.read()
         data = b"".join(
             [
                 f"--{boundary}\r\n".encode(),
@@ -64,13 +64,40 @@ class Client:
 
     def _send(self, request):
         try:
-            with urllib.request.urlopen(request) as response:
+            with _opener.open(request) as response:
                 content = response.read()
-                return response.status, json.loads(content) if content else None
+                status = response.status
         except urllib.error.HTTPError as exc:
+            if 300 <= exc.code < 400:
+                raise TransportError(
+                    f"{exc.code}: redirected to {exc.headers.get('Location')};"
+                    " use that URL for the site."
+                ) from None
             content = exc.read()
             try:
                 data = json.loads(content)
             except ValueError:
                 data = {"detail": content.decode(errors="replace") or exc.reason}
             raise APIError(exc.code, data) from None
+        except urllib.error.URLError as exc:
+            raise TransportError(f"Can't connect to {self.url}: {exc.reason}") from None
+        try:
+            return status, json.loads(content) if content else None
+        except ValueError:
+            raise TransportError(
+                f"The answer from {request.full_url} isn't JSON; is the site's URL"
+                " the API's?"
+            ) from None
+
+
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    """
+    Redirects turn a POST into a GET and would send the token along, to
+    another host too
+    """
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirects)

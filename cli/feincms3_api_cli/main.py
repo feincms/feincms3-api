@@ -10,9 +10,10 @@ change. Errors are printed with their paths.
 import argparse
 import getpass
 import json
+import os
 import sys
 
-from feincms3_api_cli.client import APIError, Client
+from feincms3_api_cli.client import APIError, Client, TransportError
 from feincms3_api_cli.config import ETags, Sites, prog
 
 
@@ -49,6 +50,9 @@ def main(argv=None):
     except CommandError as exc:
         print(f"{prog()}: {exc}", file=sys.stderr)
         return exc.code
+    except TransportError as exc:
+        print(f"{prog()}: {exc}", file=sys.stderr)
+        return FAILED
 
 
 def print_error(exc):
@@ -263,7 +267,8 @@ def update(args):
 def content(args):
     client, etags = connect(args)
     body = read_json(args.file)
-    if not (isinstance(body, dict) and "content" in body):
+    # The body, or only its regions (which may include one called "content")
+    if not (isinstance(body, dict) and isinstance(body.get("content"), dict)):
         body = {"content": body}
     _status, data = client.request(
         "PUT",
@@ -321,9 +326,11 @@ def cache_clear(args):
 def upload(args):
     client, _etags = connect(args)
     try:
-        output(client.upload(args.file)[1])
+        with open(args.file, "rb") as f:
+            content = f.read()
     except OSError as exc:
         raise CommandError(f"Can't read {args.file}: {exc}", USAGE) from exc
+    output(client.upload(os.path.basename(args.file), content)[1])
 
 
 def batch(args):
@@ -346,15 +353,15 @@ def batch(args):
         entries = {}
         for operation, result in zip(operations, data["results"], strict=False):
             resource = operation["resource"]
-            if operation["op"] == "delete":
-                entries[resource, operation["id"]] = None
-            elif operation["op"] == "create":
+            if operation["op"] == "create":
                 entries[resource, result["id"]] = _etag(result)
-            else:
-                pk = operation["id"]
-                if isinstance(pk, dict):
-                    pk = data["refs"][pk["ref"]]
-                entries[resource, pk] = _etag(result)
+                continue
+            pk = operation["id"]
+            if isinstance(pk, dict):
+                pk = data["refs"][pk["ref"]]
+            entries[resource, pk] = (
+                None if operation["op"] == "delete" else _etag(result)
+            )
         etags.update(entries)
     _written(args, data)
 

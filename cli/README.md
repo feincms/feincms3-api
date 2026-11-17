@@ -23,8 +23,9 @@ f3api site list
 f3api --site other list pages                     # the first site is the default
 ```
 
-`F3API_URL` and `F3API_TOKEN` override the configured site. Sites are kept
-in `~/.config/f3api/sites.json` (readable by you only).
+`F3API_URL` and `F3API_TOKEN` replace the default site (not one named with
+`--site`), `F3API_SITE` names the default. Sites are kept in
+`~/.config/f3api/sites.json` (readable by you only).
 
 ## Reading
 

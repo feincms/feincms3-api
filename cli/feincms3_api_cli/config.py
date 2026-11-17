@@ -1,7 +1,7 @@
 """
 Sites (URL and token) and the ETags of what was read
 
-``F3API_URL`` and ``F3API_TOKEN`` override the configured site;
+``F3API_URL`` and ``F3API_TOKEN`` replace the default site;
 ``F3API_CONFIG`` and ``F3API_CACHE`` move the files (for tests).
 """
 
@@ -39,11 +39,16 @@ def _load(path):
 
 
 def _save(path, data, *, private=False):
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(mode=0o700 if private else 0o777, parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
-    if private:
-        tmp.chmod(0o600)
+    # Readable by the user only from the start, not after writing
+    fd = os.open(
+        tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600 if private else 0o666
+    )
+    if private and hasattr(os, "fchmod"):  # Not on Windows before 3.13
+        os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(data, indent=2, sort_keys=True))
     tmp.replace(path)
 
 
@@ -74,8 +79,11 @@ class Sites:
         self.save()
 
     def resolve(self, name=None):
-        """``(url, token)``"""
-        if url := os.environ.get("F3API_URL"):
+        """
+        ``(url, token)``: of the site ``name`` (``--site``), else of
+        ``F3API_URL`` and ``F3API_TOKEN``, else of the default site
+        """
+        if not name and (url := os.environ.get("F3API_URL")):
             return url, os.environ.get("F3API_TOKEN")
         name = name or os.environ.get("F3API_SITE") or self.data.get("default")
         if not name or name not in self.data["sites"]:
@@ -84,7 +92,7 @@ class Sites:
                 " F3API_URL and F3API_TOKEN."
             )
         site = self.data["sites"][name]
-        return site["url"], os.environ.get("F3API_TOKEN") or site["token"]
+        return site["url"], site["token"]
 
 
 class ETags:
