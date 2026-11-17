@@ -8,6 +8,8 @@
   (`.github/workflows/tests.yml`) runs every `py<version>-*` environment for
   each Python version in its matrix, so keep the CI matrix, the tox envlist
   and the `pyproject.toml` classifiers in sync.
+  Without native code, the oldest and the newest Python per Django version
+  are enough; every Python of the classifiers is in some environment.
 - The test app (`tests/testapp/`) has no migrations; tables are created
   directly from the models.
 

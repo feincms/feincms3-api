@@ -2,6 +2,8 @@
 
 ## Next version
 
+- Tests run with the oldest and the newest Python per Django version.
+
 ## 0.3 (2026-11-17)
 
 - The "token created" page uses the admin's own breadcrumbs, which Django
