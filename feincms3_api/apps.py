@@ -28,11 +28,13 @@ def _content_apis():
 
 
 def check_resources(app_configs=None, **kwargs):
+    from feincms3_api.codecs import label  # noqa: PLC0415
+
     errors = []
     for api in _content_apis():
         for resource in api.resources:
             try:
-                resource.model_admin  # noqa: B018
+                model_admin = resource.model_admin
             except ImproperlyConfigured:
                 errors.append(
                     checks.Error(
@@ -42,6 +44,20 @@ def check_resources(app_configs=None, **kwargs):
                         id="feincms3_api.E001",
                     )
                 )
+                continue
+            # Plugins and other inlines are keyed by their model's type.
+            seen = set()
+            for inline in model_admin.inlines:
+                if (type_label := label(inline.model)) in seen:
+                    errors.append(
+                        checks.Error(
+                            f"The admin of {resource.type} has more than one"
+                            f" inline for {type_label}.",
+                            hint="The API keys inlines by their model's type.",
+                            id="feincms3_api.E003",
+                        )
+                    )
+                seen.add(type_label)
     return errors
 
 

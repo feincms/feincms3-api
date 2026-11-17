@@ -1,5 +1,8 @@
+from unittest import mock
+
 from django.test import SimpleTestCase
 
+from feincms3_api.apps import check_resources
 from feincms3_api.kinds import HTML, LINK, MACHINE, TEXT, json_string_kind
 from feincms3_api.paths import iter_path
 
@@ -41,3 +44,21 @@ class PathsTest(SimpleTestCase):
             found, [("data.figures[0].title", "a"), ("data.figures[1].title", "b")]
         )
         self.assertEqual(list(iter_path(fields, "missing.title")), [])
+
+
+class ChecksTest(SimpleTestCase):
+    def test_resources(self):
+        self.assertEqual(check_resources(), [])
+
+    def test_two_inlines_for_one_model(self):
+        from testapp.admin import SessionInline, TrainingAdmin  # noqa: PLC0415
+
+        class OtherSessionInline(SessionInline):
+            pass
+
+        with mock.patch.object(
+            TrainingAdmin, "inlines", [*TrainingAdmin.inlines, OtherSessionInline]
+        ):
+            [error] = check_resources()
+        self.assertEqual(error.id, "feincms3_api.E003")
+        self.assertIn("testapp.session", error.msg)

@@ -4,6 +4,8 @@
 
 - The plugin `PATCH` returns the object's `meta.warnings` and `etag` in the
   plugin's `meta`; `ContentAPI.update_plugin()` returns only the plugin.
+- A system check (`feincms3_api.E003`) reports a registered model's admin
+  with two inlines for the same model, which the API can't tell apart.
 - feincms3-data is only installed with the new `autotranslate` extra, which
   the incubator's autotranslate needs.
 - Documented the setup in the README, and the code's structure in

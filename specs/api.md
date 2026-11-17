@@ -602,7 +602,10 @@ required field without a default therefore makes objects of that type
 impossible to create through the API. One naming a model or field that doesn't exist is a
 system check error (`feincms3_api.E002`), so a typo can't quietly expose a
 field. A resource whose model isn't registered with its admin site is one
-too (`feincms3_api.E001`).
+too (`feincms3_api.E001`), and so is an admin with two inlines for the same
+model (`feincms3_api.E003`), because plugins and `inlines` are keyed by
+their model's type. The check looks at `ModelAdmin.inlines`, not at what
+`get_inlines()` returns for a request.
 
 ## Translating
 
