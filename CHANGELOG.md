@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Creating a page needs `is_active`: feincms3 defaults to active, so a
+  client has to decide. Resources list such fields in `required_on_create`
+  (also an argument), which the type's schema marks as `required`.
 - Fewer queries: hidden plugins are counted in one query instead of read
   per plugin table, and lists with `content=true` fetch the plugins once
   per inline for all items. `Resource.plugins()` returns only the visible

@@ -74,6 +74,12 @@ class SchemaMixin:
         for type, context in self.contexts(request):
             if type == type_label:
                 schema = self.adapters.lookup(type).json_schema(context)
+                for resource in self.resources:
+                    if resource.type == type and (
+                        names := resource.required_fields(request, self)
+                    ):
+                        required = schema.setdefault("required", [])
+                        required.extend(n for n in names if n not in required)
                 return {"$schema": "https://json-schema.org/draft/2020-12/schema"} | (
                     schema
                 )

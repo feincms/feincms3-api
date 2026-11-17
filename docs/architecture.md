@@ -128,6 +128,7 @@ fields and their kinds, for a snapshot test), `f3api_token`,
 |---|---|
 | expose a model | `content_api.register(ObjectResource(Model))`, or one of the subclasses |
 | filter lists | `ObjectResource(Model, filters=[...])` or `filter_fields` on a subclass |
+| make a create give a field the model has a default for | `ObjectResource(Model, required_on_create=[...])` or `required_on_create` on a subclass |
 | hide a field, or a value inside JSON data | `FEINCMS3_API["EXCLUDE_FIELDS"]` |
 | support a form field the API doesn't know | `content_api.codecs.register(FieldClass, Codec())` |
 | change a type's shape on the wire | `content_api.adapters.register("app.model", Adapter())` |

@@ -469,11 +469,16 @@ object. Several writes in one transaction over HTTP are
 ## Pages
 
 - **Creating** needs what the admin form needs: `parent` (a page or `null`
-  for a root), `title`, `slug`, `page_type`, `language_code`. `path` is
-  computed by `AbstractPage.save()`, never written, except as
-  `static_path` with `path` where the admin allows it. Defaults for new
-  pages (inactive, a slug from the title) are
-  [#8](https://github.com/feincms/feincms3-api/issues/8).
+  for a root), `title`, `slug`, `page_type`, `language_code`, and
+  `is_active`. feincms3 defaults `is_active` to true, so a client which
+  forgot it would publish; the API doesn't pick a default either, the
+  client decides. A resource's `required_on_create` lists such fields
+  (`PageResource`: `is_active`); they're `required` in the type's schema,
+  and a create without them fails with their paths. Excluded and
+  read-only fields are left out, so a create stays possible. There's no
+  slug from the title: a client writing a title can write a slug. `path`
+  is computed by `AbstractPage.save()`, never written, except as
+  `static_path` with `path` where the admin allows it.
 - **Moving** is a `PATCH` of `parent` and `position` (the position among
   siblings, as in feincms3), through the admin's form like any change, so
   feincms3 updates the descendants' paths and refuses a page below itself.

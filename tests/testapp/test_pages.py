@@ -78,6 +78,7 @@ class PagesTest(WriteTestCase):
                     "parent": self.home.pk,
                     "language_code": "de",
                     "page_type": "standard",
+                    "is_active": True,
                 }
             },
         )

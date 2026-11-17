@@ -137,6 +137,33 @@ class CreateTest(WriteTestCase):
         self.assertIn("content.sidebar", paths)
         self.assertEqual(Page.objects.count(), 3)
 
+    def test_is_active_required(self):
+        # feincms3 defaults to active; a client has to decide.
+        fields = {
+            "title": "Kontakt",
+            "slug": "kontakt",
+            "parent": self.home.pk,
+            "page_type": "standard",
+            "language_code": "de",
+        }
+        response = self.send("post", "pages/", {"fields": fields})
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            [error["path"] for error in response.json()["errors"]],
+            ["fields.is_active"],
+        )
+        schema = self.get("schema/testapp.page/").json()
+        self.assertIn("is_active", schema["required"])
+
+        response = self.send("post", "pages/", {"fields": fields | {"is_active": True}})
+        self.assertEqual(response.status_code, 201, response.content)
+        # Updates don't need it
+        path = f"pages/{response.json()['id']}/"
+        response = self.send(
+            "patch", path, {"fields": {"title": "Kontakte"}}, etag=self.etag(path)
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
     def test_permission(self):
         user = User.objects.create_user("staff", "", "staff", is_staff=True)
         user.user_permissions.add(

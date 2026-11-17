@@ -128,6 +128,16 @@ class WritingMixin:
         )
         if form is None:
             raise ValidationFailedError(errors)
+        if obj is None and not plugin:
+            given = payload.get("fields") or {}
+            errors.extend(
+                {
+                    "path": f"fields.{name}",
+                    "message": "Give this field when creating; it has no default here.",
+                }
+                for name in resource.required_fields(request, self)
+                if name not in given
+            )
         if form.is_valid():
             errors.extend(resource.validate_instance(form.instance))
             target = resource.model_admin.save_form(

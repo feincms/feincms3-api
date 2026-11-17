@@ -58,6 +58,7 @@ class SitesTest(MultisiteTestCase):
                     "slug": "kontakt",
                     "parent": self.home_org.pk,
                     "page_type": "standard",
+                    "is_active": True,
                 },
                 "content": {
                     "main": [{"type": "sitesapp.richtext", "fields": {"text": "Hi"}}]
@@ -77,6 +78,7 @@ class SitesTest(MultisiteTestCase):
                     "slug": "kontakt",
                     "parent": self.home_org.pk,
                     "page_type": "standard",
+                    "is_active": True,
                 }
             },
         )
@@ -86,7 +88,14 @@ class SitesTest(MultisiteTestCase):
     def test_root_needs_a_site(self):
         response = self.post(
             "site-pages/",
-            {"fields": {"title": "Start", "slug": "start", "page_type": "standard"}},
+            {
+                "fields": {
+                    "title": "Start",
+                    "slug": "start",
+                    "page_type": "standard",
+                    "is_active": True,
+                }
+            },
         )
         self.assertEqual(response.status_code, 422)
         response = self.post(
@@ -96,6 +105,7 @@ class SitesTest(MultisiteTestCase):
                     "title": "Start",
                     "slug": "start",
                     "page_type": "standard",
+                    "is_active": True,
                     "site": {"type": "feincms3_sites.site", "id": self.org.pk},
                 }
             },
@@ -151,6 +161,7 @@ class LanguageSitesTest(MultisiteTestCase):
                     "parent": self.fr.pk,
                     "language_code": "fr",
                     "page_type": "standard",
+                    "is_active": True,
                 }
             },
         )

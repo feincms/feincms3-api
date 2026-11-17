@@ -148,8 +148,19 @@ class Resource:
     #: ``filters=`` replaces them
     filter_fields = ("language_code", "is_active", "translation_of", "site")
 
+    #: Fields a create must give, although the model has a default;
+    #: ``required_on_create=`` replaces them
+    required_on_create = ()
+
     def __init__(
-        self, model, *, name=None, admin_site=None, title_field=None, filters=None
+        self,
+        model,
+        *,
+        name=None,
+        admin_site=None,
+        title_field=None,
+        filters=None,
+        required_on_create=None,
     ):
         self.model = model
         # Not the verbose name: URLs mustn't change with the language.
@@ -158,6 +169,8 @@ class Resource:
         self.title_field = title_field
         if filters is not None:
             self.filter_fields = tuple(filters)
+        if required_on_create is not None:
+            self.required_on_create = tuple(required_on_create)
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.name} {self.type}>"
@@ -213,6 +226,18 @@ class Resource:
             return None
 
     # Permissions ############################################################
+
+    def required_fields(self, request, api):
+        """``required_on_create`` without the fields the user can't write"""
+        if not self.required_on_create:
+            return []
+        context = self.context(request, None, api)
+        properties = api.adapters.lookup(self.type).json_schema(context)["properties"]
+        return [
+            name
+            for name in self.required_on_create
+            if name in properties and not properties[name].get("readOnly")
+        ]
 
     def has_view_permission(self, request, obj=None):
         return self.model_admin.has_view_or_change_permission(request, obj)
@@ -575,6 +600,8 @@ class PageResource(TreeResource):
     """feincms3 pages: a tree, with paths"""
 
     filter_fields = (*TreeResource.filter_fields, "page_type", "path")
+    # feincms3 defaults to active, so a client forgetting it would publish.
+    required_on_create = ("is_active",)
     findable = True
 
     def path_scope(self):
