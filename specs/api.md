@@ -285,10 +285,19 @@ codec without being registered.
 | `DecimalField` | string, to keep the precision | `format: decimal` |
 | date, time, date and time, duration fields | ISO 8601 string | `format` |
 | `ModelChoiceField`, `ModelMultipleChoiceField` (cabinet's `CabinetForeignKey` included) | reference(s) | the target type (`x-feincms3-ref`), nullable |
-| django-prose-editor field | HTML string | `contentMediaType: text/html` |
+| django-prose-editor field | HTML string | `contentMediaType: text/html`; the allowed markup (`x-feincms3-html`) |
 | django-json-schema-editor `JSONEditorField` | the JSON value | the field's own schema with kinds; its foreign keys marked as references |
 | `JSONField` | the JSON value | none |
 | `FileField`, `ImageField` (the object's own file) | `{"name", "url"}`; written as `{"upload": id}` | `x-feincms3-file` |
+
+**Allowed markup.** A django-prose-editor field configured with
+`extensions` knows which tags, attributes and URL schemes they produce; its
+schema says so in `x-feincms3-html`: prose-editor's nh3 allowlist (`tags`,
+`attributes` per tag, `url_schemes`, `allowed_classes`, … as far as the
+extensions set them) and `sanitized`, whether the form or model field
+removes everything else (`sanitize=True`). Without sanitising, the
+allowlist describes the editor, not what the server enforces. Fields in
+prose-editor's legacy mode (no `extensions`) have no `x-feincms3-html`.
 
 **Text for people.** Every string in the schema also says what it is
 (`feincms3_api.kinds`, from autotranslate's `fields.py`): `"x-feincms3-kind"`

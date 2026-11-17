@@ -267,7 +267,14 @@ class Download(PagePlugin):
 
 
 class ArticleRichText(ArticlePlugin):
-    text = ProseEditorField()
+    text = ProseEditorField(
+        extensions={
+            "Bold": True,
+            "Link": {"protocols": ["https", "mailto"]},
+            "Heading": {"levels": [2, 3]},
+        },
+        sanitize=True,
+    )
 
 
 class ArticleButton(ArticlePlugin):

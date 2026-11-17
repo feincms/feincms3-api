@@ -49,6 +49,7 @@ except ImportError:  # pragma: no cover
 
 KIND = "x-feincms3-kind"
 REF = "x-feincms3-ref"
+HTML_ALLOWED = "x-feincms3-html"
 
 
 def label(model):
@@ -154,7 +155,44 @@ class HTMLCodec(CharCodec):
     kind = HTML
 
     def json_schema(self, field):
-        return {**super().json_schema(field), "contentMediaType": "text/html"}
+        schema = {**super().json_schema(field), "contentMediaType": "text/html"}
+        if (allowed := allowed_html(field)) is not None:
+            schema[HTML_ALLOWED] = allowed
+        return schema
+
+
+def allowed_html(field):
+    """
+    The markup a django-prose-editor field allows, from its extensions, as
+    nh3's allowlist (``tags``, ``attributes``, ``url_schemes``, …), and
+    whether the form or model field removes everything else
+    (``sanitize=True``); ``None`` for fields without extensions
+    (prose-editor's legacy mode)
+    """
+    form_field = field.form_field
+    extensions = (getattr(form_field, "config", None) or {}).get("extensions")
+    if extensions is None:
+        return None
+    from django_prose_editor import fields  # noqa: PLC0415
+    from django_prose_editor.config import allowlist_from_extensions  # noqa: PLC0415
+
+    allowed = {}
+    for key, value in allowlist_from_extensions(extensions).items():
+        if isinstance(value, set | frozenset | list | tuple):
+            allowed[key] = sorted(value)
+        elif isinstance(value, dict):
+            allowed[key] = {tag: sorted(items) for tag, items in sorted(value.items())}
+    # Without sanitising, prose-editor only drops empty paragraphs.
+    passing = {
+        getattr(fields, "_identity", None),
+        getattr(fields, "_actually_empty", None),
+    }
+    allowed["sanitized"] = any(
+        getattr(f, "sanitize", None) not in passing
+        for f in (form_field, field.model_field)
+        if hasattr(f, "sanitize")
+    )
+    return allowed
 
 
 class BooleanCodec(Codec):

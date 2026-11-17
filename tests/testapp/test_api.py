@@ -334,6 +334,22 @@ class SchemaTest(APITestCase):
 
         self.assertEqual(self.get("schema/testapp.nothing/").status_code, 404)
 
+    def test_allowed_html(self):
+        # From the prose-editor field's extensions
+        text = self.get("schema/testapp.articlerichtext/").json()["properties"]["text"]
+        self.assertEqual(
+            text["x-feincms3-html"],
+            {
+                "tags": ["a", "h2", "h3", "p", "strong"],
+                "attributes": {"a": ["href", "rel", "target", "title"]},
+                "url_schemes": ["https", "mailto"],
+                "sanitized": True,
+            },
+        )
+        # Legacy mode, nothing known
+        text = self.get("schema/testapp.richtext/").json()["properties"]["text"]
+        self.assertNotIn("x-feincms3-html", text)
+
     def test_snapshot(self):
         out = io.StringIO()
         call_command("f3api_schema", "testapp.content_api.content_api", stdout=out)

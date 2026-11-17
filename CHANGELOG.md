@@ -2,6 +2,9 @@
 
 ## Next version
 
+- The schema of a django-prose-editor field with `extensions` says which
+  markup it allows (`x-feincms3-html`: tags, attributes, URL schemes) and
+  whether the field sanitises the rest away.
 - Added `POST /batch/` (`ContentAPI.batch()`): several writes in one
   transaction, all or none, with one dry run for all of them;
   `{"ref": name}` stands for the id of an object created earlier in the

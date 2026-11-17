@@ -44,7 +44,7 @@ optional-dependencies.tests = [
   "coverage",
   "django-cabinet",
   "django-json-schema-editor",
-  "django-prose-editor",
+  "django-prose-editor[sanitize]",
   "django-translated-fields",
   "feincms3-forms",
   "feincms3-language-sites",
