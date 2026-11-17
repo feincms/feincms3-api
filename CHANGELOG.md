@@ -2,6 +2,8 @@
 
 ## Next version
 
+- Added an integration guide, `docs/integration.md`.
+
 ## 0.1 (2026-11-17)
 
 Backwards incompatible:
