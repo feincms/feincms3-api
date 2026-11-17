@@ -100,7 +100,8 @@ change.
 
 **System checks** run with `./manage.py check` and in every test run:
 `E001` a resource's model without an admin, `E002` an `EXCLUDE_FIELDS`
-entry which doesn't exist, `E003` two inlines with the same model.
+entry which doesn't exist, `E003` two inlines with the same model, `E004` a
+`KINDS` entry which doesn't exist or names no kind.
 
 **The schema snapshot** lists every type the API exposes, with its fields
 and what kind of value each is, as a superuser sees them:
@@ -158,10 +159,23 @@ Go through it line by line once:
 - **Is the kind right?** The kinds tell translators and agents what to do
   with a string: `text` and `html` are translated, `link` is mapped to the
   other language's counterpart, `machine` is kept. Kinds come from the form
-  field (`URLField` is a link, `SlugField` machine) and from the name (`url`
-  and `*_url` are links, `ppoi` and `*_ppoi` machine). A `CharField` holding
-  a CSS class or an identifier is `text` unless told otherwise; see
-  [custom form fields](#custom-form-fields) below.
+  field (`URLField` is a link, `SlugField` machine) and from the name (`url`,
+  `link`, `*_url` and `*_link` are links, `ppoi` and `*_ppoi` machine). A
+  `CharField` holding a color, a CSS class or an inline SVG is `text` unless
+  told otherwise, per field:
+
+  ```python
+  FEINCMS3_API = {
+      "KINDS": {
+          "projects.customer.svg": "machine",
+          "tipps.tipplist.color": "machine",
+          "pages.jsonplugin_teaser.data.items[].target": "link",
+      },
+  }
+  ```
+
+  For a form field class of the project's own, register a codec instead;
+  see [custom form fields](#custom-form-fields) below.
 - **Is something missing?** Lines like `excluded: color (no codec for
   ColorFormField)` are form fields the API doesn't know. It leaves them out
   instead of guessing; register a codec for them.
@@ -300,7 +314,8 @@ open an issue, it may point to something the API should handle itself.
 - [ ] Every registered model has a `ModelAdmin`; `./manage.py check` passes.
 - [ ] The snapshot is committed and compared in a test.
 - [ ] Secrets and internal fields are in `EXCLUDE_FIELDS`.
-- [ ] Kinds are right; no unexpected `excluded:` lines.
+- [ ] Kinds are right (`KINDS` where they aren't); no unexpected
+      `excluded:` lines.
 - [ ] Side effects of saving use `transaction.on_commit()`.
 - [ ] `cache_keys()` covers what the project caches.
 - [ ] `f3api_cleanup` runs daily.

@@ -88,6 +88,9 @@ FEINCMS3_API = {
         "forms.form.recipient_email",
         "pages.jsonplugin_key_figures.data.internal_note",
     ],
+    # What a string is, where its form field and name don't tell
+    "KINDS": {"tipps.tipplist.color": "machine"},
+    "MAX_BATCH_OPERATIONS": 100,
     "DEFAULT_PAGE_SIZE": 50,
     "MAX_PAGE_SIZE": 200,
     "TOKEN_LIFETIME": timedelta(hours=8),

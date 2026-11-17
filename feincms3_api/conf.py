@@ -7,6 +7,10 @@ DEFAULTS = {
     # ``app_label.model_name.field``, or a path into JSON data
     # (``app_label.model_name.data.figures[].unit``): never exposed.
     "EXCLUDE_FIELDS": [],
+    # ``{path: kind}`` with paths as above: the kind of a string where the
+    # field's type and name don't tell (``text``, ``html``, ``link``,
+    # ``machine``, ``choices``)
+    "KINDS": {},
     "MAX_PAGE_SIZE": 200,
     "DEFAULT_PAGE_SIZE": 50,
     # Operations in one ``POST /batch/``
@@ -31,3 +35,13 @@ def excluded_paths(type_label):
         for entry in config()["EXCLUDE_FIELDS"]
         if entry.strip().startswith(prefix)
     ]
+
+
+def kind_paths(type_label):
+    """The kinds set for one type: ``{"data.unit": "machine"}``"""
+    prefix = f"{type_label}."
+    return {
+        entry.strip().removeprefix(prefix): kind
+        for entry, kind in config()["KINDS"].items()
+        if entry.strip().startswith(prefix)
+    }

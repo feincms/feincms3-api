@@ -350,6 +350,25 @@ class SchemaTest(APITestCase):
         text = self.get("schema/testapp.richtext/").json()["properties"]["text"]
         self.assertNotIn("x-feincms3-html", text)
 
+    @override_settings(
+        FEINCMS3_API={
+            "KINDS": {
+                "testapp.button.button_label": "machine",
+                "testapp.jsonplugin_key_figures.data.figures[].title": "machine",
+                "testapp.button.missing": "machine",
+            }
+        }
+    )
+    def test_kinds_setting(self):
+        button = self.get("schema/testapp.button/").json()["properties"]
+        self.assertEqual(button["button_label"]["x-feincms3-kind"], "machine")
+        self.assertEqual(button["button_url"]["x-feincms3-kind"], "link")
+        figures = self.get("schema/testapp.jsonplugin_key_figures/").json()
+        title = figures["properties"]["data"]["properties"]["figures"]["items"][
+            "properties"
+        ]["title"]
+        self.assertEqual(title["x-feincms3-kind"], "machine")
+
     def test_snapshot(self):
         out = io.StringIO()
         call_command("f3api_schema", "testapp.content_api.content_api", stdout=out)

@@ -50,8 +50,8 @@ def is_machine_name(name):
 
 
 def is_link_name(name):
-    """``url`` and ``*_url`` hold a URL, whatever their type"""
-    return name == "url" or name.endswith("_url")
+    """``url``, ``link``, ``*_url`` and ``*_link`` hold a URL, whatever their type"""
+    return name in {"url", "link"} or name.endswith(("_url", "_link"))
 
 
 def schema_paths(schema, prefix, name=""):

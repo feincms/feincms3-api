@@ -14,8 +14,8 @@ from django import forms
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import models, transaction
 
-from feincms3_api.codecs import Field, UploadRef, codecs as default_codecs
-from feincms3_api.conf import excluded_paths
+from feincms3_api.codecs import KIND, Field, UploadRef, codecs as default_codecs
+from feincms3_api.conf import excluded_paths, kind_paths
 from feincms3_api.errors import WireError
 from feincms3_api.paths import iter_path, tokens
 
@@ -265,6 +265,9 @@ class FormAdapter:
             schema["required"] = required
         for path in context.excluded_paths:
             _remove_schema_path(schema, path)
+        for path, kind in kind_paths(context.type).items():
+            if (node := _schema_node(schema, path)) is not None:
+                node[KIND] = kind
         if excluded:
             schema["x-feincms3-excluded"] = excluded
         return schema
@@ -275,6 +278,20 @@ def _remove_paths(data, paths):
         if len(tokens(path)) > 1:
             for _concrete, container, key in reversed(list(iter_path(data, path))):
                 del container[key]
+
+
+def _schema_node(schema, path):
+    """The schema of the value at ``path``, or ``None``"""
+    node = schema
+    for token in tokens(path):
+        node = (
+            node.get("items")
+            if token is None
+            else node.get("properties", {}).get(token)
+        )
+        if not isinstance(node, dict):
+            return None
+    return node
 
 
 def _remove_schema_path(schema, path):

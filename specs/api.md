@@ -306,6 +306,14 @@ choice list, `value|label` lines of which only the labels are text). That's
 what a translating agent (see "Translating") or a spell checker needs to
 know, and the snapshot shows it.
 
+The kind comes from the form field (`URLField` is a link, `SlugField`
+machine), the name (`url`, `link`, `*_url` and `*_link` are links; `slug`,
+`path`, `ppoi` and the like machine), the JSON schema's `format`, and the
+model (feincms3's HTML plugin's `html` is markup for browsers: machine).
+Where none of these tell, e.g. a `CharField` holding a color or an inline
+SVG, the project sets it per field with the `KINDS` setting, in the path
+notation, inside JSON data too.
+
 A form field without a codec isn't guessed at: the field is left out, and
 `/schema/` and the snapshot list it as excluded, naming the form field
 class. The project registers a codec or excludes the field explicitly.
@@ -674,6 +682,10 @@ FEINCMS3_API = {
         "forms.configuredform.recipient_email",
         "pages.jsonplugin_key_figures.data.internal_note",
     ],
+    "KINDS": {
+        "tipps.tipplist.color": "machine",
+        "pages.jsonplugin_teaser.data.items[].target": "link",
+    },
     "DEFAULT_PAGE_SIZE": 50,
     "MAX_PAGE_SIZE": 200,
     "MAX_BATCH_OPERATIONS": 100,
@@ -692,7 +704,8 @@ field. A resource whose model isn't registered with its admin site is one
 too (`feincms3_api.E001`), and so is an admin with two inlines for the same
 model (`feincms3_api.E003`), because plugins and `inlines` are keyed by
 their model's type. The check looks at `ModelAdmin.inlines`, not at what
-`get_inlines()` returns for a request.
+`get_inlines()` returns for a request. `KINDS` entries naming no field, or
+no kind, are errors as well (`feincms3_api.E004`).
 
 ## Translating
 

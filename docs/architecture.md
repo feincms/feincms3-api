@@ -131,8 +131,8 @@ file for a later write; the target field saves a copy with its own
 `upload_to` once the write uses it.
 
 **Settings and checks** (`conf.py`, `apps.py`): `FEINCMS3_API`, and system
-checks for resources without an admin and for `EXCLUDE_FIELDS` entries
-which don't exist.
+checks for resources without an admin and for `EXCLUDE_FIELDS` and
+`KINDS` entries which don't exist.
 
 **Management commands**: `f3api_schema` (the snapshot: every type with its
 fields and their kinds, for a snapshot test), `f3api_token`,
@@ -151,6 +151,7 @@ that one, so a write fails rather than overwrite a change made since.
 | filter lists | `ObjectResource(Model, filters=[...])` or `filter_fields` on a subclass |
 | make a create give a field the model has a default for | `ObjectResource(Model, required_on_create=[...])` or `required_on_create` on a subclass |
 | hide a field, or a value inside JSON data | `FEINCMS3_API["EXCLUDE_FIELDS"]` |
+| say what a string is where its type and name don't | `FEINCMS3_API["KINDS"]` |
 | support a form field the API doesn't know | `content_api.codecs.register(FieldClass, Codec())` |
 | change a type's shape on the wire | `content_api.adapters.register("app.model", Adapter())` |
 | describe references to a model differently | `Resource.describe()` |

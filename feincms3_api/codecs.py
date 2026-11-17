@@ -15,6 +15,7 @@ import decimal
 from django import forms
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
+from feincms3.plugins import html as html_plugin
 
 from feincms3_api.errors import WireError
 from feincms3_api.kinds import (
@@ -118,6 +119,9 @@ def string_kind(field):
             forms.UUIDField,
         ),
     ):
+        return MACHINE
+    # feincms3's HTML plugin: embed codes and scripts, not text for people
+    if name == "html" and issubclass(field.model, html_plugin.HTML):
         return MACHINE
     if FormFieldBase is not None and issubclass(field.model, FormFieldBase):
         # The name is the key submissions are stored under, and the default

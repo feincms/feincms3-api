@@ -2,6 +2,10 @@
 
 ## Next version
 
+- Kinds: `link` and `*_link` are link names, feincms3's HTML plugin's `html`
+  is `machine`, and the new `KINDS` setting sets the kind per field or JSON
+  path where the type and name don't tell (system check
+  `feincms3_api.E004`).
 - Batches: an `etag` given for an object written earlier in the batch is
   ignored instead of failing with 412; a field called `ref` isn't taken for
   a reference; operations of the wrong shape (an `op`, `ref` or `resource`

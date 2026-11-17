@@ -61,26 +61,47 @@ def check_resources(app_configs=None, **kwargs):
     return errors
 
 
-def check_exclude_fields(app_configs=None, **kwargs):
-    from feincms3_api.conf import config  # noqa: PLC0415
+def _names_field(entry):
+    """Whether ``entry`` (``app_label.model_name.field…``) names a field"""
     from feincms3_api.paths import tokens  # noqa: PLC0415
 
-    errors = []
-    for entry in config()["EXCLUDE_FIELDS"]:
-        app_label, _sep, rest = entry.strip().partition(".")
-        model_name, _sep, path = rest.partition(".")
-        try:
-            model = apps.get_model(app_label, model_name)
-        except (LookupError, ValueError):
-            model = None
-        names = {field.name for field in model._meta.get_fields()} if model else set()
-        first = tokens(path)[0] if path else None
-        if first is None or first not in names:
+    app_label, _sep, rest = entry.strip().partition(".")
+    model_name, _sep, path = rest.partition(".")
+    try:
+        model = apps.get_model(app_label, model_name)
+    except (LookupError, ValueError):
+        return False
+    names = {field.name for field in model._meta.get_fields()}
+    return bool(path) and tokens(path)[0] in names
+
+
+def check_exclude_fields(app_configs=None, **kwargs):
+    from feincms3_api.conf import config  # noqa: PLC0415
+    from feincms3_api.kinds import CHOICES, HTML, LINK, MACHINE, TEXT  # noqa: PLC0415
+
+    errors = [
+        checks.Error(
+            f"FEINCMS3_API['EXCLUDE_FIELDS'] entry {entry!r} names no model and field.",
+            id="feincms3_api.E002",
+        )
+        for entry in config()["EXCLUDE_FIELDS"]
+        if not _names_field(entry)
+    ]
+    kinds = {TEXT, HTML, LINK, MACHINE, CHOICES}
+    for entry, kind in config()["KINDS"].items():
+        if not _names_field(entry):
             errors.append(
                 checks.Error(
-                    f"FEINCMS3_API['EXCLUDE_FIELDS'] entry {entry!r} names no"
-                    " model and field.",
-                    id="feincms3_api.E002",
+                    f"FEINCMS3_API['KINDS'] entry {entry!r} names no model and field.",
+                    id="feincms3_api.E004",
+                )
+            )
+        if kind not in kinds:
+            errors.append(
+                checks.Error(
+                    f"FEINCMS3_API['KINDS'] entry {entry!r}: {kind!r} isn't one"
+                    f" of {', '.join(sorted(kinds))}.",
+                    id="feincms3_api.E004",
                 )
             )
     return errors
