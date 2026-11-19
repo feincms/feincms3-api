@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.5.1 (2026-11-19)
+
 - Writes reject unknown keys in the body (`"Unknown key."`) instead of
   ignoring them: `{"title": "x"}` instead of `{"fields": {"title": "x"}}`
   reported success without changing anything.
