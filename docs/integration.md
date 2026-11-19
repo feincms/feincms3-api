@@ -305,7 +305,11 @@ open an issue, it may point to something the API should handle itself.
 - **Tokens**: staff users create their own in the admin (the secret is
   shown once); `./manage.py f3api_token USERNAME --write` prints one for a
   script. Tokens act as their user, are read-only unless created for
-  writing, and expire after `TOKEN_LIFETIME` (8 hours by default). For
+  writing, and expire after `TOKEN_LIFETIME` (8 hours by default). Users
+  list and revoke their own tokens over the API (`GET /tokens/`, `DELETE
+  /tokens/{id}/`, `DELETE /tokens/current/`; `f3api tokens`, `f3api
+  logout`). The routes come with the API; no resource can be called
+  `tokens`. For
   scripts and agents, create a staff user with only the permissions they
   need rather than using a superuser's token.
 - **Cleanup**: run `./manage.py f3api_cleanup` daily; it removes expired

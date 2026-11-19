@@ -112,8 +112,10 @@ Only active staff users can use the API, with their admin permissions.
 Scripts and agents use tokens: staff users create their own in the admin
 (the secret is shown once), or `./manage.py f3api_token USERNAME --write`
 prints one. Tokens are read-only unless created for writing, and expire
-after `TOKEN_LIFETIME`. `./manage.py f3api_cleanup` removes expired tokens
-and uploads; run it daily.
+after `TOKEN_LIFETIME`. `GET /tokens/` lists your tokens, `DELETE
+/tokens/{id}/` revokes one and `DELETE /tokens/current/` the one in use
+(read-only tokens may revoke themselves, but no others). `./manage.py
+f3api_cleanup` removes expired tokens and uploads; run it daily.
 
 ```bash
 API=https://example.com/api/content

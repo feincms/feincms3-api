@@ -22,6 +22,11 @@ f3api site list
 f3api --site other list pages                     # the first site is the default
 ```
 
+`f3api tokens` lists your tokens (`*` marks the one in use), `f3api tokens
+delete ID …` revokes them, e.g. one which leaked. `f3api logout` revokes
+the token in use and removes the site (or tells you to unset
+`F3API_TOKEN`); a token which has expired already counts as revoked.
+
 `F3API_URL` and `F3API_TOKEN` replace the default site (not one named with
 `--site`), `F3API_SITE` names the default. Sites are kept in
 `~/.config/f3api/sites.json` (readable by you only).

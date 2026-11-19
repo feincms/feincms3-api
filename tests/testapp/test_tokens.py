@@ -110,6 +110,103 @@ class TokenTest(TestCase):
             call_command("f3api_token", "user")
 
 
+class OwnTokensTest(TestCase):
+    """Users list and revoke their own tokens through the API"""
+
+    def setUp(self):
+        self.staff = User.objects.create_user("staff", "", "staff", is_staff=True)
+        self.write, self.write_secret = APIToken.objects.create_token(
+            user=self.staff, name="Laptop", access=APIToken.Access.WRITE
+        )
+        self.read, self.read_secret = APIToken.objects.create_token(
+            user=self.staff, name="Agent"
+        )
+        self.expired, _secret = APIToken.objects.create_token(
+            user=self.staff, name="Old", expires_at=timezone.now()
+        )
+        other = User.objects.create_user("other", "", "other", is_staff=True)
+        self.other, _secret = APIToken.objects.create_token(
+            user=other, name="Other", access=APIToken.Access.WRITE
+        )
+
+    def request(self, method, path, secret):
+        return getattr(self.client, method)(
+            f"/api/{path}", headers={"authorization": f"Bearer {secret}"}
+        )
+
+    def test_list(self):
+        response = self.request("get", "tokens/", self.read_secret)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [(token["name"], token["current"]) for token in response.json()],
+            [("Agent", True), ("Laptop", False)],
+        )
+        self.assertEqual(response.json()[0]["prefix"], self.read.prefix)
+
+    def test_revoke(self):
+        # Read-only tokens may not revoke others, tokens of other users and
+        # expired ones aren't found
+        response = self.request("delete", f"tokens/{self.write.pk}/", self.read_secret)
+        self.assertEqual(response.status_code, 403)
+        response = self.request("delete", f"tokens/{self.other.pk}/", self.write_secret)
+        self.assertEqual(response.status_code, 404)
+        response = self.request(
+            "delete", f"tokens/{self.expired.pk}/", self.write_secret
+        )
+        self.assertEqual(response.status_code, 404)
+
+        response = self.request("delete", f"tokens/{self.read.pk}/", self.write_secret)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Agent")
+        self.assertFalse(response.json()["current"])
+        self.assertEqual(
+            self.request("get", "tokens/", self.read_secret).status_code, 401
+        )
+        self.assertEqual(
+            set(APIToken.objects.filter(expires_at__gt=timezone.now())),
+            {self.write, self.other},
+        )
+
+    def test_revoke_current(self):
+        response = self.request("delete", "tokens/current/", self.read_secret)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["name"], "Agent")
+        self.assertTrue(response.json()["current"])
+        self.assertFalse(APIToken.objects.filter(pk=self.read.pk).exists())
+        self.assertEqual(
+            self.request("get", "tokens/", self.read_secret).status_code, 401
+        )
+
+    def test_read_only_revokes_itself_by_id(self):
+        response = self.request("delete", f"tokens/{self.read.pk}/", self.read_secret)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["current"])
+
+    def test_read_only_still_reads_only(self):
+        response = self.request("delete", "pages/1/", self.read_secret)
+        self.assertEqual(response.status_code, 403)
+
+    def test_session(self):
+        self.client.force_login(self.staff)
+        response = self.client.get("/api/tokens/")
+        self.assertEqual(
+            [(token["name"], token["current"]) for token in response.json()],
+            [("Agent", False), ("Laptop", False)],
+        )
+        # Sessions have no current token
+        response = self.client.delete("/api/tokens/current/")
+        self.assertEqual(response.status_code, 400)
+        response = self.client.delete(f"/api/tokens/{self.read.pk}/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_reserved(self):
+        from feincms3_api.api import ContentAPI  # noqa: PLC0415
+        from feincms3_api.resources import ObjectResource  # noqa: PLC0415
+
+        with self.assertRaises(ValueError):
+            ContentAPI().register(ObjectResource(Page, name="tokens"))
+
+
 class TokenAdminTest(TestCase):
     def setUp(self):
         self.staff = User.objects.create_user("staff", "", "staff", is_staff=True)

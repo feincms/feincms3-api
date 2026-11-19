@@ -126,7 +126,9 @@ included) and describes them with `Resource.describe()`, in
 
 **Auth, tokens and uploads** (`auth.py`, `models.py`, `admin.py`).
 `APIToken` stores an HMAC of the secret, is found by it, and acts as its
-user; staff users manage their own tokens in the admin. `Upload` stages a
+user; staff users manage their own tokens in the admin, and list and
+revoke them over the API (`tokens.py`, `GET /tokens/`, `DELETE
+/tokens/{id}/`, `DELETE /tokens/current/`). `Upload` stages a
 file for a later write; the target field saves a copy with its own
 `upload_to` once the write uses it. `stored.py` deletes those copies again
 when the write or its batch is rolled back (a dry run, an error), since

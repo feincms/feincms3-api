@@ -1,7 +1,7 @@
 """
 The feincms3 content API from the command line (``f3api``)
 
-Reads print JSON; ``site list``, ``resources`` and ``list`` print tables
+Reads print JSON; ``site list``, ``resources``, ``list`` and ``tokens`` print tables
 in a terminal (JSON with ``--json``, or when the output isn't a terminal).
 Writes are dry runs unless ``--apply`` is given, and send the ETag of the
 object as it was last read with this tool (``get``, ``list``, ``find``), so
@@ -176,6 +176,112 @@ def site_default(name):
         Sites().set_default(name)
     except KeyError as exc:
         raise CommandError(f"No site {name!r}.", USAGE) from exc
+
+
+# Tokens #####################################################################
+
+
+def _site_name():
+    site = click.get_current_context().find_root().params.get("site")
+    try:
+        return Sites().resolve_name(site)
+    except LookupError as exc:
+        raise CommandError(str(exc), USAGE) from exc
+
+
+def _forget(name):
+    """Forget the site whose token was revoked, and say so"""
+    if name is None:
+        message("unset F3API_TOKEN, the token doesn't work anymore.")
+    else:
+        Sites().remove(name)
+        message(
+            f"removed the site {name!r}; add it again with a new token"
+            f" ({prog()} site add)."
+        )
+
+
+@cli.command()
+def logout():
+    """Revoke the token in use and forget the site."""
+    name = _site_name()
+    client, _etags = connect()
+    try:
+        client.request("DELETE", "tokens/current/")
+    except APIError as exc:
+        # 401: the token doesn't work anymore (expired, revoked), it's gone
+        if exc.status != 401:
+            _forget(name)
+            data = exc.data if isinstance(exc.data, dict) else {}
+            raise CommandError(
+                f"couldn't revoke the token ({exc.status} {data.get('detail', '')});"
+                " delete it in the admin."
+            ) from exc
+    except TransportError as exc:
+        _forget(name)
+        raise CommandError(
+            f"couldn't revoke the token ({exc}); delete it in the admin."
+        ) from exc
+    _forget(name)
+
+
+@cli.group(invoke_without_command=True)
+@click.pass_context
+def tokens(ctx):
+    """Your tokens; without a command, lists them."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(tokens_list)
+
+
+def _when(value):
+    return value[:16].replace("T", " ") if value else ""
+
+
+@tokens.command("list")
+@json_option
+def tokens_list(as_json):
+    """Your tokens which haven't expired; * marks the one in use."""
+    client, _etags = connect()
+    _status, data = client.request("GET", "tokens/")
+    if wants_json(as_json):
+        output(data)
+        return
+    rows = table("ID>", "Name", "Prefix", "Access", "Created", "Last used", "Expires")
+    for token in data:
+        rows.add_row(
+            f"{'*' if token['current'] else ''}{token['id']}",
+            token["name"],
+            token["prefix"],
+            token["access"],
+            _when(token["created_at"]),
+            _when(token["last_used_at"]),
+            _when(token["expires_at"]),
+        )
+    console.print(rows)
+
+
+@tokens.command("delete")
+@click.argument("ids", nargs=-1, type=int, required=True)
+@json_option
+def tokens_delete(ids, as_json):
+    """Revoke tokens by ID (see `tokens list`), e.g. leaked ones.
+
+    Revoking the token in use forgets the site, like `logout`. Read-only
+    tokens may only revoke themselves."""
+    name = _site_name()
+    client, _etags = connect()
+    _status, data = client.request("GET", "tokens/")
+    current = {token["id"] for token in data if token["current"]}
+    deleted = []
+    # The token in use last, the others need it
+    for pk in sorted(set(ids), key=lambda pk: pk in current):
+        _status, token = client.request("DELETE", f"tokens/{pk}/")
+        deleted.append(token)
+        message(f"revoked {token['name'] or token['prefix']} ({pk}).")
+        if token["current"]:
+            _forget(name)
+    if wants_json(as_json):
+        output(deleted)
 
 
 # Reading ####################################################################

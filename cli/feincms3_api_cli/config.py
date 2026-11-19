@@ -78,19 +78,25 @@ class Sites:
         self.data["default"] = name
         self.save()
 
-    def resolve(self, name=None):
+    def resolve_name(self, name=None):
         """
-        ``(url, token)``: of the site ``name`` (``--site``), else of
-        ``F3API_URL`` and ``F3API_TOKEN``, else of the default site
+        The site's name: ``name`` (``--site``), else ``None`` for
+        ``F3API_URL`` and ``F3API_TOKEN``, else the default site's
         """
-        if not name and (url := os.environ.get("F3API_URL")):
-            return url, os.environ.get("F3API_TOKEN")
+        if not name and os.environ.get("F3API_URL"):
+            return None
         name = name or os.environ.get("F3API_SITE") or self.data.get("default")
         if not name or name not in self.data["sites"]:
             raise LookupError(
                 f"No site: add one with `{prog()} site add NAME URL`, or set"
                 " F3API_URL and F3API_TOKEN."
             )
+        return name
+
+    def resolve(self, name=None):
+        """``(url, token)`` of the site (see ``resolve_name()``)"""
+        if (name := self.resolve_name(name)) is None:
+            return os.environ["F3API_URL"], os.environ.get("F3API_TOKEN")
         site = self.data["sites"][name]
         return site["url"], site["token"]
 

@@ -238,6 +238,50 @@ class CLITest(LiveServerTestCase):
             code, data, err = self.run_cli("--site", "here", "list", "pages")
         self.assertEqual(code, 0, err)
 
+    def test_tokens_and_logout(self):
+        user = User.objects.get(username="admin")
+        laptop, laptop_secret = APIToken.objects.create_token(
+            user=user, name="laptop", access=APIToken.Access.WRITE
+        )
+        current = APIToken.objects.for_secret(self.secret)
+        code, out, err = self.run_cli("tokens", tty=True)
+        self.assertEqual(code, 0, err)
+        self.assertIn(f"*{current.pk}", out)
+        self.assertIn("laptop", out)
+
+        # The token in use goes last, and its site is forgotten
+        code, data, err = self.run_cli("tokens", "delete", current.pk, laptop.pk)
+        self.assertEqual(code, 0, err)
+        self.assertEqual([token["name"] for token in data], ["laptop", "cli"])
+        self.assertIn("unset F3API_TOKEN", err)
+        self.assertFalse(APIToken.objects.exists())
+
+        _token, secret = APIToken.objects.create_token(user=user, name="read")
+
+        def add_site(url, secret):
+            self.run_cli("site", "add", "here", url, "--token-stdin", stdin=secret)
+
+        with mock.patch.dict(os.environ, {"F3API_URL": ""}):
+            add_site(f"{self.live_server_url}/api/", secret)
+            # Read-only tokens may revoke themselves
+            code, _data, err = self.run_cli("logout")
+            self.assertEqual(code, 0, err)
+            self.assertIn("removed the site 'here'", err)
+            self.assertFalse(APIToken.objects.exists())
+            self.assertEqual(self.run_cli("site", "list")[1], {})
+
+            # A token which doesn't work anymore is gone already
+            add_site(f"{self.live_server_url}/api/", secret)
+            code, _data, err = self.run_cli("logout")
+            self.assertEqual(code, 0, err)
+
+            # Other failures forget the site too, and say so
+            add_site("http://127.0.0.1:1/", laptop_secret)
+            code, _data, err = self.run_cli("logout")
+            self.assertEqual(code, 1)
+            self.assertIn("couldn't revoke the token", err)
+            self.assertEqual(self.run_cli("site", "list")[1], {})
+
     def test_transport_errors(self):
         with mock.patch.dict(os.environ, {"F3API_URL": "http://127.0.0.1:1/"}):
             code, _data, err = self.run_cli("list", "pages")

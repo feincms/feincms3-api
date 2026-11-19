@@ -383,6 +383,7 @@ not the verbose name, which changes with the language):
 | `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `POST /batch/` | several writes in one transaction, see "Batches" |
+| `GET /tokens/`, `DELETE /tokens/{id}/`, `DELETE /tokens/current/` | the user's tokens, revoking one, see "Authentication and permissions" |
 | `GET|POST /files/`, `GET|PATCH|DELETE /files/{id}/` | cabinet, see below |
 | `GET|POST /folders/`, `GET|PATCH|DELETE /folders/{id}/` | cabinet folders |
 
@@ -675,6 +676,16 @@ are [#5](https://github.com/feincms/feincms3-api/issues/5).
 - A token belongs to a user and acts with that user's admin permissions,
   never more. Tokens are read-only or read-write, expire, and are stored
   hashed. A read-only token refuses everything but `GET`/`HEAD`/`OPTIONS`.
+- **Revoking tokens:** `GET /tokens/` lists the user's tokens which haven't
+  expired (name, prefix, access, dates, and `current` for the one
+  authenticating the request), `DELETE /tokens/{id}/` revokes one of them
+  and returns it, `DELETE /tokens/current/` the one authenticating the
+  request (logging out; a `400` for sessions). A user's tokens are what the
+  admin shows them anyway, so any of their tokens (and their session) sees
+  and revokes the others, e.g. one which leaked. Read-only tokens may
+  revoke themselves, but no others: revoking isn't reading, yet an agent
+  with a read-only token should be able to log out. `schema`, `uploads`,
+  `batch` and `tokens` can't be resource names.
 - Only staff users (`is_staff`) can use the API at all, since every
   permission check goes through the admin.
 - Who changed what: `LogEntry` rows as the admin writes them

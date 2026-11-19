@@ -3,6 +3,10 @@
 ## Next version
 
 - Tests run with the oldest and the newest Python per Django version.
+- Users list and revoke their own tokens over the API: `GET /tokens/`,
+  `DELETE /tokens/{id}/` and `DELETE /tokens/current/` (logging out).
+  Read-only tokens may revoke themselves, but no others. `tokens` can't be
+  a resource's name anymore.
 - Fixed: writes with an invalid token (expired, revoked) were a `403`
   "CSRF check Failed" of the session auth tried next instead of a `401`.
   Requests with a bearer token don't fall back to the session anymore.

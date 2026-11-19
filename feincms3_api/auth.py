@@ -1,3 +1,5 @@
+import copy
+
 from django.utils.translation import gettext as _
 from ninja.errors import HttpError
 from ninja.security import HttpBearer, SessionAuthIsStaff
@@ -9,13 +11,20 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 class TokenAuth(HttpBearer):
-    """``Authorization: Bearer f3api_…`` with an ``APIToken``"""
+    """``Authorization: Bearer f3api_…`` with an ``APIToken``
+
+    Read-only tokens only get ``GET``, ``HEAD`` and ``OPTIONS``, unless
+    ``allow_read_only`` is set (revoking the token itself).
+    """
+
+    allow_read_only = False
 
     def authenticate(self, request, token):
         if (api_token := APIToken.objects.for_secret(token)) is None:
             return None
         if (
             api_token.access == APIToken.Access.READ
+            and not self.allow_read_only
             and request.method not in SAFE_METHODS
         ):
             raise HttpError(403, _("This API token only allows reading."))
@@ -41,3 +50,17 @@ class StaffSessionAuth(SessionAuthIsStaff):
 def default_auth():
     """Tokens first: session auth fails without a CSRF token"""
     return [TokenAuth(), StaffSessionAuth()]
+
+
+def allowing_read_only(auth):
+    """``auth`` with its ``TokenAuth`` letting read-only tokens through"""
+    auth = auth if isinstance(auth, list | tuple) else [auth]
+    result = []
+    for item in auth:
+        if isinstance(item, TokenAuth):
+            permissive = copy.copy(item)
+            permissive.allow_read_only = True
+            result.append(permissive)
+        else:
+            result.append(item)
+    return result

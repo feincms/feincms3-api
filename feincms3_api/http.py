@@ -1,14 +1,18 @@
 """The django-ninja router around the operations"""
 
+import datetime as dt
 import functools
-from typing import Any
+from typing import Any, Literal
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from ninja import Body, File, Router, Schema, UploadedFile
+from ninja import Body, Field, File, Router, Schema, UploadedFile
 
+from feincms3_api.api import RESERVED
+from feincms3_api.auth import allowing_read_only
 from feincms3_api.errors import APIError, NotFoundError
 from feincms3_api.openapi import component_name
 from feincms3_api.reading import _bool, expands_references
+from feincms3_api.tokens import list_tokens, revoke_current_token, revoke_token
 
 
 class ObjectIn(Schema):
@@ -23,6 +27,17 @@ class ContentIn(Schema):
 
 class PluginIn(Schema):
     fields: dict[str, Any]
+
+
+class APITokenInfo(Schema):
+    id: int
+    name: str
+    prefix: str
+    access: Literal["read", "write"]
+    created_at: dt.datetime
+    last_used_at: dt.datetime | None
+    expires_at: dt.datetime
+    current: bool = Field(description="Whether this token authenticated the request.")
 
 
 def build_router(api):
@@ -63,6 +78,29 @@ def build_router(api):
         """Several writes in one transaction, all of them or none"""
         return api.batch(request, payload, dry_run=dry_run)
 
+    @router.get("tokens/", operation_id="tokens", response=list[APITokenInfo])
+    def tokens(request):
+        """The user's tokens which haven't expired, newest first"""
+        return list_tokens(request)
+
+    # Read-only tokens may revoke themselves
+    revoking = {
+        "auth": allowing_read_only(api.auth),
+        "response": {200: APITokenInfo} | dict.fromkeys((400, 403, 404), error_type),
+    }
+
+    @router.delete("tokens/current/", operation_id="token_revoke_current", **revoking)
+    @_errors
+    def token_revoke_current(request):
+        """Revoke the token authenticating the request (logging out)"""
+        return revoke_current_token(request)
+
+    @router.delete("tokens/{token_id}/", operation_id="token_revoke", **revoking)
+    @_errors
+    def token_revoke(request, token_id: int):
+        """Revoke one of the user's tokens; read-only tokens only themselves"""
+        return revoke_token(request, token_id)
+
     for resource in api.resources:
         _add_routes(api, router, resource, api.components)
 
@@ -81,7 +119,7 @@ def build_router(api):
             if resource.has_view_permission(request)
         ]
         name = rest.split("/", maxsplit=1)[0]
-        if name not in [*names, "schema", "uploads", "batch"]:
+        if name not in [*names, *RESERVED]:
             raise NotFoundError(
                 f"No resource {name!r}. The resources: {', '.join(names)}."
             )
