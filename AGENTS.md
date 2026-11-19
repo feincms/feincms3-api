@@ -3,7 +3,10 @@
 ## Tests
 
 - Quick run with the local virtualenv:
-  `.venv/bin/python tests/manage.py test testapp`
+  `.venv/bin/python tests/manage.py test testapp`. When the virtualenv
+  doesn't match the code (e.g. a missing dependency), update it
+  (`uv pip install --python .venv/bin/python -e '.[tests]' -e ./cli`) or
+  replace it.
 - Full matrix: `tox` (environments are listed in `tox.ini`). CI
   (`.github/workflows/tests.yml`) runs every `py<version>-*` environment for
   each Python version in its matrix, so keep the CI matrix, the tox envlist
