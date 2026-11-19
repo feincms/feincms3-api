@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.4 (2026-11-19)
+
 - **Backwards incompatible:** the token admin needs the model permissions
   (`feincms3_api.view_apitoken`, `add_`, `change_`, `delete_`) like the
   rest of the admin; before, every staff user managed their own tokens
