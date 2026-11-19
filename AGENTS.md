@@ -26,6 +26,14 @@
   date when settings, hooks, checks or the setup change, and add what
   integrating real projects teaches (gates, deployment, kinds).
 - `feincms3_api/`: the API (django-ninja), the main purpose of the package.
+- The docs are built with Sphinx and MyST on Read the Docs
+  (`.readthedocs.yaml`, `docs/conf.py`); `tox -e docs` builds them with
+  warnings as errors. The Markdown files are written for GitHub: link
+  between them with relative paths, `docs/conf.py` rewrites the links for
+  the docs. Files outside `docs/` (the spec, the CLI's README, the
+  changelogs) are pulled in by stub pages with `{include}`; a new one needs
+  a stub, an entry in `PAGES` in `docs/conf.py` and in the toctree of
+  `docs/index.md`.
 - `tests/testapp/snapshot.txt`: the `f3api_schema` output for the test app;
   regenerate it with `.venv/bin/python tests/manage.py f3api_schema
   testapp.content_api.content_api > tests/testapp/snapshot.txt` and look at

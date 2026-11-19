@@ -2,6 +2,8 @@
 
 ## Next version
 
+- Documentation on Read the Docs, built from the Markdown files with Sphinx
+  and MyST (`tox -e docs`).
 - Tests run with the oldest and the newest Python per Django version.
 - Users list and revoke their own tokens over the API: `GET /tokens/`,
   `DELETE /tokens/{id}/` and `DELETE /tokens/current/` (logging out).

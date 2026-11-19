@@ -47,6 +47,7 @@ optional-dependencies.tests = [
   "openapi-spec-validator",
   "rich>=13",
 ]
+urls.Documentation = "https://feincms3-api.readthedocs.io/"
 urls.Homepage = "https://github.com/feincms/feincms3-api/"
 
 [tool.hatch]
