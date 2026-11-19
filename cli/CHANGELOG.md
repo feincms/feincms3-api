@@ -2,7 +2,8 @@
 
 ## Next version
 
-- Needs feincms3-api with the resources below `resources/`.
+- Needs feincms3-api 0.5 or later on the server (the resources are below
+  `resources/`).
 - `f3api move RESOURCE ID POSITION [RELATIVE_TO]` moves a node in its
   tree.
 - `find` uses the resource with paths, if there is only one, instead of
