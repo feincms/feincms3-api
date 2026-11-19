@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.5 (2026-11-19)
+
 - Needs feincms3-api 0.5 or later on the server (the resources are below
   `resources/`).
 - `f3api move RESOURCE ID POSITION [RELATIVE_TO]` moves a node in its
