@@ -225,7 +225,7 @@ class CLITest(LiveServerTestCase):
             # The old name still works, but isn't listed
             self.assertEqual(self.run_cli("site", "list")[1], data)
             code, help, _err = self.run_cli("--help", tty=True)
-            self.assertNotIn(" site ", help)
+            self.assertNotIn("\n  site ", help)
             config = Path(self.dirs.name) / "config" / "sites.json"
             self.assertEqual(config.stat().st_mode & 0o777, 0o600)
             with mock.patch.dict(os.environ, {"F3API_TOKEN": ""}):
