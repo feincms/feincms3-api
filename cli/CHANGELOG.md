@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.4 (2026-11-19)
+
 - `f3api tokens` (or `tokens list`) lists your tokens, `f3api tokens
   delete ID …` revokes them, `f3api logout` revokes the token in use and
   removes the site. Needs feincms3-api with `/tokens/`.
