@@ -303,7 +303,13 @@ open an issue, it may point to something the API should handle itself.
 ## Running it
 
 - **Tokens**: staff users create their own in the admin (the secret is
-  shown once); `./manage.py f3api_token USERNAME --write` prints one for a
+  shown once), with the model permissions as everywhere in the admin:
+  grant `feincms3_api.view_apitoken`, `add_apitoken`, `change_apitoken`
+  and `delete_apitoken` to the users or groups who should have tokens
+  (with django-authlib's roles, a glob like `feincms3_api.*`). Superusers
+  have them anyway and also manage everyone else's tokens. Taking the
+  permissions away doesn't revoke tokens a user already has; delete them
+  in the admin, or let them expire. `./manage.py f3api_token USERNAME --write` prints one for a
   script. Tokens act as their user, are read-only unless created for
   writing, and expire after `TOKEN_LIFETIME` (8 hours by default). Users
   list and revoke their own tokens over the API (`GET /tokens/`, `DELETE

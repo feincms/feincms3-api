@@ -8,10 +8,13 @@ from feincms3_api.models import APIToken
 @admin.register(APIToken)
 class APITokenAdmin(admin.ModelAdmin):
     """
-    Every active staff user manages their own tokens, superusers everyone's
+    Staff users manage their own tokens, superusers everyone's
 
-    A token never acts with more permissions than its user, so creating one
-    needs no permission of its own. The secret is shown once, on a page of
+    Each action needs its model permission, as everywhere in the admin
+    (``feincms3_api.view_apitoken``, ``add_``, ``change_``, ``delete_``);
+    grant them to whoever should have tokens. ``get_queryset()`` limits
+    everyone but superusers to their own tokens. A token never acts with
+    more permissions than its user. The secret is shown once, on a page of
     its own after saving.
     """
 
@@ -57,24 +60,6 @@ class APITokenAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return self.list_display
         return [field for field in self.list_display if field != "user"]
-
-    def _is_own(self, request, obj):
-        return obj is None or request.user.is_superuser or obj.user == request.user
-
-    def has_module_permission(self, request):
-        return request.user.is_active and request.user.is_staff
-
-    def has_view_permission(self, request, obj=None):
-        return self.has_module_permission(request) and self._is_own(request, obj)
-
-    def has_add_permission(self, request):
-        return self.has_module_permission(request)
-
-    def has_change_permission(self, request, obj=None):
-        return self.has_view_permission(request, obj)
-
-    def has_delete_permission(self, request, obj=None):
-        return self.has_view_permission(request, obj)
 
     def save_model(self, request, obj, form, change):
         if not change:

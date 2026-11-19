@@ -657,10 +657,15 @@ are [#5](https://github.com/feincms/feincms3-api/issues/5).
   session auth's CSRF failure.
 - **Bearer tokens** for scripts and agents, from a token model in the
   package (`APIToken`), since the API is tiresome to use without them.
-- **Creating tokens:** in the admin, where every active staff user manages
-  their own (superusers everyone's) without any model permission, so people
-  without server access can get one; the secret is shown once, on a page of
-  its own, not in a message (message storage can be a cookie). Or
+- **Creating tokens:** in the admin, where staff users manage their own
+  (superusers everyone's), so people without server access can get one.
+  Each action needs its model permission (`feincms3_api.view_apitoken`,
+  `add_`, `change_`, `delete_`), like everything in the admin, so a project
+  decides who gets tokens with its permissions, groups or roles. Taking the
+  permissions away doesn't revoke existing tokens. Earlier versions needed
+  no permission, but then no project could stop staff users from creating
+  tokens. The secret is shown once, on a page of its own, not in a
+  message (message storage can be a cookie). Or
   `./manage.py f3api_token USERNAME [--write] [--hours N]`, which prints it.
 - **Storing them:** a secret is `f3api_` plus 32 random bytes; only its
   HMAC-SHA256 with `SECRET_KEY` (`salted_hmac`) is stored, and tokens are

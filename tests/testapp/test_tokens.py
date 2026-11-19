@@ -1,7 +1,7 @@
 import io
 from datetime import timedelta
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.core.management import CommandError, call_command
 from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
@@ -207,11 +207,78 @@ class OwnTokensTest(TestCase):
             ContentAPI().register(ObjectResource(Page, name="tokens"))
 
 
+def grant(user, *actions):
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="feincms3_api",
+            codename__in=[f"{action}_apitoken" for action in actions],
+        )
+    )
+
+
 class TokenAdminTest(TestCase):
     def setUp(self):
         self.staff = User.objects.create_user("staff", "", "staff", is_staff=True)
         self.other = User.objects.create_user("other", "", "other", is_staff=True)
+        grant(self.staff, "view", "add", "change", "delete")
         self.client.force_login(self.staff)
+
+    def test_no_permissions(self):
+        self.client.force_login(self.other)
+        response = self.client.get("/admin/")
+        self.assertNotContains(response, "/admin/feincms3_api/")
+        for path in [
+            "/admin/feincms3_api/apitoken/",
+            "/admin/feincms3_api/apitoken/add/",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 403)
+
+    def test_view_permission_only(self):
+        reader = User.objects.create_user("reader", "", "reader", is_staff=True)
+        grant(reader, "view")
+        own, _secret = APIToken.objects.create_token(user=reader, name="own")
+        self.client.force_login(reader)
+        self.assertContains(self.client.get("/admin/"), "/admin/feincms3_api/")
+        response = self.client.get("/admin/feincms3_api/apitoken/")
+        self.assertContains(response, "own")
+        self.assertNotContains(response, "/admin/feincms3_api/apitoken/add/")
+        self.assertEqual(
+            self.client.get("/admin/feincms3_api/apitoken/add/").status_code, 403
+        )
+        # The change view is read-only
+        response = self.client.post(
+            f"/admin/feincms3_api/apitoken/{own.pk}/change/", {"name": "changed"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                f"/admin/feincms3_api/apitoken/{own.pk}/delete/", {"post": "yes"}
+            ).status_code,
+            403,
+        )
+        own.refresh_from_db()
+        self.assertEqual(own.name, "own")
+
+    def test_change_own_token(self):
+        own, _secret = APIToken.objects.create_token(user=self.staff, name="own")
+        response = self.client.get(f"/admin/feincms3_api/apitoken/{own.pk}/change/")
+        self.assertContains(response, 'name="name"')
+        # Non-superusers don't pick users
+        self.assertNotContains(response, 'name="user"')
+        response = self.client.get("/admin/feincms3_api/apitoken/add/")
+        self.assertNotContains(response, 'name="user"')
+        self.client.post(
+            f"/admin/feincms3_api/apitoken/{own.pk}/change/",
+            {
+                "name": "changed",
+                "access": "read",
+                "expires_at_0": "2099-01-01",
+                "expires_at_1": "00:00:00",
+            },
+        )
+        own.refresh_from_db()
+        self.assertEqual(own.name, "changed")
 
     def test_access_as_radio_buttons(self):
         response = self.client.get("/admin/feincms3_api/apitoken/add/")
@@ -243,7 +310,6 @@ class TokenAdminTest(TestCase):
         self.assertEqual(str(token), f"{token.prefix}…")
 
     def test_create_own_token(self):
-        # No model permissions needed
         response = self.client.post(
             "/admin/feincms3_api/apitoken/add/",
             {
@@ -275,6 +341,12 @@ class TokenAdminTest(TestCase):
             ).status_code,
             302,  # The admin redirects for objects it can't find
         )
+        self.assertEqual(
+            self.client.post(
+                f"/admin/feincms3_api/apitoken/{other.pk}/delete/", {"post": "yes"}
+            ).status_code,
+            302,
+        )
         self.client.post(
             f"/admin/feincms3_api/apitoken/{own.pk}/delete/", {"post": "yes"}
         )
@@ -295,6 +367,8 @@ class TokenAdminTest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(APIToken.objects.get().user, self.other)
+        response = self.client.get("/admin/feincms3_api/apitoken/")
+        self.assertContains(response, "Import")
 
 
 class TokenKeyTest(TestCase):

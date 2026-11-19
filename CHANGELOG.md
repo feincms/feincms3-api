@@ -2,6 +2,13 @@
 
 ## Next version
 
+- **Backwards incompatible:** the token admin needs the model permissions
+  (`feincms3_api.view_apitoken`, `add_`, `change_`, `delete_`) like the
+  rest of the admin; before, every staff user managed their own tokens
+  and projects couldn't prevent it. Grant the permissions to the users,
+  groups or roles who should have tokens (`feincms3_api.*` with
+  django-authlib's roles) to keep self-service tokens. Taking them away
+  doesn't revoke existing tokens.
 - Documentation on Read the Docs, built from the Markdown files with Sphinx
   and MyST (`tox -e docs`).
 - Tests run with the oldest and the newest Python per Django version.

@@ -126,7 +126,8 @@ included) and describes them with `Resource.describe()`, in
 
 **Auth, tokens and uploads** (`auth.py`, `models.py`, `admin.py`).
 `APIToken` stores an HMAC of the secret, is found by it, and acts as its
-user; staff users manage their own tokens in the admin, and list and
+user; staff users manage their own tokens in the admin (with the
+`feincms3_api` permissions), and list and
 revoke them over the API (`tokens.py`, `GET /tokens/`, `DELETE
 /tokens/{id}/`, `DELETE /tokens/current/`). `Upload` stages a
 file for a later write; the target field saves a copy with its own

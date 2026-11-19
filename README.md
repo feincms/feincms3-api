@@ -111,8 +111,9 @@ visible through the API only after someone looked at the diff.
 ## Using it
 
 Only active staff users can use the API, with their admin permissions.
-Scripts and agents use tokens: staff users create their own in the admin
-(the secret is shown once), or `./manage.py f3api_token USERNAME --write`
+Scripts and agents use tokens: staff users with the `feincms3_api`
+permissions (`view_apitoken`, `add_apitoken`, ...) create their own in the
+admin (the secret is shown once), or `./manage.py f3api_token USERNAME --write`
 prints one. Tokens are read-only unless created for writing, and expire
 after `TOKEN_LIFETIME`. `GET /tokens/` lists your tokens, `DELETE
 /tokens/{id}/` revokes one and `DELETE /tokens/current/` the one in use
