@@ -36,7 +36,9 @@ def snapshot(api):
         type_schema = api.adapters.lookup(type).json_schema(context)
         info = schema["types"][type]
         if resource := info.get("resource"):
-            lines.append(f"{type} (resource {resource})")
+            # The resource's name, where it isn't the type (the default)
+            named = f" {resource}" if resource != type else ""
+            lines.append(f"{type} (resource{named})")
         elif inline_of := info.get("inline_of"):
             lines.append(f"{type} (inline of {inline_of})")
         else:

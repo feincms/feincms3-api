@@ -125,8 +125,8 @@ API=https://example.com/api/content
 AUTH="Authorization: Bearer f3api_…"
 
 curl -H "$AUTH" $API/schema/                       # what's there
-curl -H "$AUTH" "$API/resources/pages/find/?path=/de/angebot/"
-curl -H "$AUTH" "$API/resources/pages/17/?expand=references"  # one page with its content
+curl -H "$AUTH" "$API/resources/pages.page/find/?path=/de/angebot/"
+curl -H "$AUTH" "$API/resources/pages.page/17/?expand=references"  # one page with its content
 ```
 
 Writes need the ETag of what was read (`If-Match`), and fail as a whole with
@@ -135,7 +135,7 @@ which is rolled back and returns what it would have done:
 
 ```bash
 curl -X PUT -H "$AUTH" -H 'If-Match: "9f2c…"' -H "Content-Type: application/json" \
-  "$API/resources/pages/17/content/?dry_run=true" \
+  "$API/resources/pages.page/17/content/?dry_run=true" \
   -d '{"content": {"main": [
         {"type": "pages.richtext", "fields": {"text": "<h2>Hello</h2>"}}
       ]}}'

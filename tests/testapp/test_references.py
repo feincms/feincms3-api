@@ -31,7 +31,7 @@ class ReferencesTest(APITestCase):
             ordering=90,
             data={"title": "Weg", "page": "999999"},
         )
-        self.path = f"resources/pages/{self.angebot.pk}/"
+        self.path = f"resources/testapp.page/{self.angebot.pk}/"
 
     def test_detail(self):
         plain = self.get(self.path).json()
@@ -60,7 +60,7 @@ class ReferencesTest(APITestCase):
 
     def test_files_and_inlines(self):
         data = self.get(
-            f"resources/persons/{self.person.pk}/", expand="references"
+            f"resources/testapp.person/{self.person.pk}/", expand="references"
         ).json()
         portrait = data["meta"]["references"]["cabinet.file"][str(self.portrait.pk)]
         self.assertEqual(portrait["name"], "anna.png")
@@ -73,7 +73,7 @@ class ReferencesTest(APITestCase):
         )
         Speaker.objects.create(training=training, person=self.person)
         data = self.get(
-            f"resources/trainings/{training.pk}/", expand="references"
+            f"resources/testapp.training/{training.pk}/", expand="references"
         ).json()
         self.assertEqual(
             data["meta"]["references"]["testapp.person"][str(self.person.pk)]["title"],
@@ -82,7 +82,10 @@ class ReferencesTest(APITestCase):
 
     def test_list_find_and_plugin(self):
         data = self.get(
-            "resources/pages/", expand="references", content="true", language_code="de"
+            "resources/testapp.page/",
+            expand="references",
+            content="true",
+            language_code="de",
         ).json()
         by_id = {item["id"]: item for item in data["items"]}
         self.assertIn("testapp.person", by_id[self.angebot.pk]["meta"]["references"])
@@ -90,7 +93,7 @@ class ReferencesTest(APITestCase):
         self.assertEqual(by_id[self.home.pk]["meta"]["references"], {})
 
         data = self.client.get(
-            "/api/resources/pages/find/",
+            "/api/resources/testapp.page/find/",
             {"path": "/de/angebot/", "expand": "references"},
         ).json()
         self.assertIn("testapp.person", data["meta"]["references"])

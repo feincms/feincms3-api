@@ -48,19 +48,19 @@ sites, so go by the schema, not by assumptions.
 Walk the tree from the start page, a level at a time:
 
 ```bash
-f3api list pages -f parent=17 --fields title,path,is_active,language_code --limit 200
+f3api list pages.page -f parent=17 --fields title,path,is_active,language_code --limit 200
 ```
 
 or list a language at once:
 
 ```bash
-f3api list pages -f language_code=de --fields title,path,is_active --limit 200
+f3api list pages.page -f language_code=de --fields title,path,is_active --limit 200
 ```
 
 Then read each page with its references:
 
 ```bash
-f3api get pages 17 --expand
+f3api get pages.page 17 --expand
 ```
 
 For a large site, review subtree by subtree (or hand subtrees to
@@ -75,7 +75,7 @@ Structure and references:
   not see).
 - **Links to inactive pages**: references to and internal links to pages
   with `is_active: false`, from active pages
-  (`f3api list pages -f is_active=false --fields title,path --limit 200`).
+  (`f3api list pages.page -f is_active=false --fields title,path --limit 200`).
 - **Internal links** in `html` fields, `link` fields and JSON data: paths
   (`/de/…`) and absolute URLs to the site's own host (the host of the
   pages' `meta.url`). Check each path once with
@@ -96,7 +96,7 @@ Completeness:
   image plugins' alt fields), very large or tiny images (`width`,
   `height`, `size`).
 - **Translations**: for each page in the main language,
-  `f3api list pages -f translation_of=17 --fields language_code,title,path`;
+  `f3api list pages.page -f translation_of=17 --fields language_code,title,path`;
   list what's missing per language, and translations whose `is_active`
   differs from the source's.
 - **Leftovers**: placeholder text ("Lorem ipsum", "TODO", "xxx", "Dummy"),
@@ -128,12 +128,12 @@ checked (external links, resources left out).
 ## 6. Fixes, only when asked
 
 Fix what the user picks, page by page. Read the page again right before
-changing it (`f3api get pages 17`), so the write sends a current ETag:
+changing it (`f3api get pages.page 17`), so the write sends a current ETag:
 
 ```bash
-f3api update-plugin pages 17 pages.richtext 101 fix.json   # one plugin: dry run
-f3api update-plugin pages 17 pages.richtext 101 fix.json --apply
-f3api update pages 17 changes.json --apply                  # fields of the page
+f3api update-plugin pages.page 17 pages.richtext 101 fix.json   # one plugin: dry run
+f3api update-plugin pages.page 17 pages.richtext 101 fix.json --apply
+f3api update pages.page 17 changes.json --apply                  # fields of the page
 ```
 
 A write fails with exit code 4 if an editor changed the page in the

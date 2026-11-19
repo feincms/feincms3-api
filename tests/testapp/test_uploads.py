@@ -32,7 +32,7 @@ class UploadTest(WriteTestCase):
         return response.json()
 
     def put_download(self, file, **params):
-        path = f"resources/pages/{self.angebot.pk}/"
+        path = f"resources/testapp.page/{self.angebot.pk}/"
         return self.send(
             "patch",
             f"{path}plugins/testapp.download/{self.download.pk}/",
@@ -66,7 +66,7 @@ class UploadTest(WriteTestCase):
 
     def test_create_plugin_with_upload(self):
         data = self.upload()
-        path = f"resources/pages/{self.home.pk}/"
+        path = f"resources/testapp.page/{self.home.pk}/"
         response = self.send(
             "put",
             f"{path}content/",
@@ -104,11 +104,11 @@ class UploadTest(WriteTestCase):
 
     def test_failed_batch_removes_stored_files(self):
         data = self.upload(name="batch.pdf")
-        path = f"resources/pages/{self.angebot.pk}/"
+        path = f"resources/testapp.page/{self.angebot.pk}/"
         operations = [
             {
                 "op": "update_plugin",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "id": self.angebot.pk,
                 "etag": self.etag(path),
                 "plugin": {"type": "testapp.download", "id": self.download.pk},
@@ -116,7 +116,7 @@ class UploadTest(WriteTestCase):
             },
             {
                 "op": "update",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "id": self.angebot.pk,
                 "fields": {"title": ""},
             },
@@ -136,9 +136,9 @@ class UploadTest(WriteTestCase):
         self.assertTrue(default_storage.exists(self.download.file.name))
 
     def test_keep_and_clear(self):
-        current = self.get(f"resources/pages/{self.angebot.pk}/").json()["content"][
-            "main"
-        ][5]
+        current = self.get(f"resources/testapp.page/{self.angebot.pk}/").json()[
+            "content"
+        ]["main"][5]
         response = self.put_download(current["fields"]["file"])
         self.assertEqual(response.status_code, 200, response.content)
         self.download.refresh_from_db()

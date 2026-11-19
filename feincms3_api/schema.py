@@ -33,6 +33,7 @@ class SchemaMixin:
                     "title": str(resource.model._meta.verbose_name),
                     "filters": resource.filters(),
                     "search": resource.searchable(request),
+                    "findable": resource.findable,
                     "region_sets": region_sets,
                     "inlines": [
                         label(inline.model)

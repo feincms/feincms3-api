@@ -18,7 +18,7 @@ class FormsTest(WriteTestCase):
     def create_form(self):
         response = self.send(
             "post",
-            "resources/forms/",
+            "resources/testapp.form/",
             {
                 "fields": {
                     "name": "Feedback",
@@ -84,7 +84,7 @@ class FormsTest(WriteTestCase):
 
         # One proxy's plugin is found under its own type only
         select = SimpleField.objects.get(parent=form, type="select")
-        path = f"resources/forms/{form.pk}/"
+        path = f"resources/testapp.form/{form.pk}/"
         self.assertEqual(
             self.get(
                 f"{path}plugins/testapp.simplefield_text/{select.pk}/"
@@ -124,7 +124,9 @@ class FormsTest(WriteTestCase):
         Text.objects.create(
             parent=form, region="form", ordering=60, name="stars", label="Sterne"
         )
-        warnings = self.get(f"resources/forms/{form.pk}/").json()["meta"]["warnings"]
+        warnings = self.get(f"resources/testapp.form/{form.pk}/").json()["meta"][
+            "warnings"
+        ]
         # The email field has no inline, the name "stars" is used twice
         self.assertEqual(
             [(w["level"], w.get("path")) for w in warnings],
@@ -133,13 +135,15 @@ class FormsTest(WriteTestCase):
         self.assertIn("'stars' (2)", warnings[1]["message"])
 
         Form.objects.filter(pk=form.pk).update(form_type="gone")
-        warnings = self.get(f"resources/forms/{form.pk}/").json()["meta"]["warnings"]
+        warnings = self.get(f"resources/testapp.form/{form.pk}/").json()["meta"][
+            "warnings"
+        ]
         self.assertEqual(warnings[-1]["level"], "error")
         self.assertEqual(warnings[-1]["path"], "fields.form_type")
 
     def test_schema(self):
         data = self.get("schema/").json()
-        form = next(r for r in data["resources"] if r["name"] == "forms")
+        form = next(r for r in data["resources"] if r["name"] == "testapp.form")
         self.assertEqual(
             form["region_sets"],
             [
@@ -176,7 +180,7 @@ class ChaptersTest(WriteTestCase):
     def test_create_and_move(self):
         response = self.send(
             "post",
-            "resources/chapters/",
+            "resources/testapp.chapter/",
             {
                 "fields": {
                     "textbook": self.book.pk,
@@ -200,13 +204,13 @@ class ChaptersTest(WriteTestCase):
         self.assertEqual(ChapterText.objects.get(parent=pulleys).text, "<p>Zug</p>")
         self.assertNotIn("path", response.json()["meta"])
 
-        data = self.get("resources/chapters/", parent=self.mechanics.pk).json()
+        data = self.get("resources/testapp.chapter/", parent=self.mechanics.pk).json()
         self.assertEqual(
             [item["id"] for item in data["items"]], [self.levers.pk, pulleys.pk]
         )
 
         # Moved to the top level
-        path = f"resources/chapters/{pulleys.pk}/"
+        path = f"resources/testapp.chapter/{pulleys.pk}/"
         response = self.send(
             "patch", path, {"fields": {"parent": None}}, etag=self.etag(path)
         )
@@ -217,7 +221,7 @@ class ChaptersTest(WriteTestCase):
         # Not below itself
         response = self.send(
             "patch",
-            f"resources/chapters/{self.mechanics.pk}/",
+            f"resources/testapp.chapter/{self.mechanics.pk}/",
             {"fields": {"parent": self.levers.pk}},
             etag="*",
         )
@@ -225,7 +229,7 @@ class ChaptersTest(WriteTestCase):
 
     def test_delete_with_children(self):
         response = self.send(
-            "delete", f"resources/chapters/{self.mechanics.pk}/", etag="*"
+            "delete", f"resources/testapp.chapter/{self.mechanics.pk}/", etag="*"
         )
         self.assertEqual(response.status_code, 409)
         self.assertEqual(
@@ -233,7 +237,7 @@ class ChaptersTest(WriteTestCase):
         )
         self.assertEqual(
             self.send(
-                "delete", f"resources/chapters/{self.levers.pk}/", etag="*"
+                "delete", f"resources/testapp.chapter/{self.levers.pk}/", etag="*"
             ).status_code,
             204,
         )

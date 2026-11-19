@@ -22,7 +22,7 @@ class InlinesTest(WriteTestCase):
         )
         self.morning = Session.objects.create(training=self.training, title="Morgen")
         self.evening = Session.objects.create(training=self.training, title="Abend")
-        self.path = f"resources/trainings/{self.training.pk}/"
+        self.path = f"resources/testapp.training/{self.training.pk}/"
 
     def test_read(self):
         data = self.get(self.path).json()
@@ -52,7 +52,9 @@ class InlinesTest(WriteTestCase):
         self.assertNotIn("content", data)
 
         schema = self.get("schema/").json()
-        training = next(r for r in schema["resources"] if r["name"] == "trainings")
+        training = next(
+            r for r in schema["resources"] if r["name"] == "testapp.training"
+        )
         self.assertEqual(training["inlines"], ["testapp.speaker", "testapp.session"])
         self.assertEqual(
             schema["types"]["testapp.session"]["inline_of"], "testapp.training"
@@ -100,7 +102,7 @@ class InlinesTest(WriteTestCase):
         with self.settings(FEINCMS3_API={}):
             response = self.send(
                 "post",
-                "resources/trainings/",
+                "resources/testapp.training/",
                 {
                     "fields": {"title": "Neu", "slug": "neu", "language_code": "de"},
                     "inlines": {
@@ -207,7 +209,7 @@ class InlinesTest(WriteTestCase):
 class HooksTest(WriteTestCase):
     def test_save_related(self):
         article = Article.objects.create(title="News", slug="news", language_code="de")
-        path = f"resources/articles/{article.pk}/"
+        path = f"resources/testapp.article/{article.pk}/"
         writes = [
             ("patch", path, {"fields": {"title": "Neu"}}),
             (

@@ -61,7 +61,7 @@ apart from references, which are mapped (step 5).
 For a subtree, walk it, parents before children:
 
 ```bash
-f3api list pages -f parent=17 --fields title,path --limit 200
+f3api list pages.page -f parent=17 --fields title,path --limit 200
 ```
 
 Repeat for each child. Other resources with `language_code` and
@@ -71,7 +71,7 @@ the same way, without the tree.
 Then find what's translated already, per object:
 
 ```bash
-f3api list pages -f translation_of=17 -f language_code=fr --fields title,path
+f3api list pages.page -f translation_of=17 -f language_code=fr --fields title,path
 ```
 
 Skip objects which have a translation, and say so; update one only when
@@ -80,10 +80,10 @@ the user asked for it (step 8).
 ## 4. Turn each source object into a create operation
 
 ```bash
-f3api get pages 17 --expand        # fields, content, inlines, meta.references
+f3api get pages.page 17 --expand        # fields, content, inlines, meta.references
 ```
 
-From what `get` prints, build `{"op": "create", "resource": "pages", "ref":
+From what `get` prints, build `{"op": "create", "resource": "pages.page", "ref":
 …, "fields": …, "content": …, "inlines": …}`:
 
 - **Drop** `id`, `type` and `meta` of the object, fields the schema marks
@@ -111,7 +111,7 @@ References (`{"type": …, "id": …}`, and ids JSON data marks with
 to objects in the source language. For each, find the counterpart:
 
 ```bash
-f3api list pages -f translation_of=44 -f language_code=fr --fields title,path
+f3api list pages.page -f translation_of=44 -f language_code=fr --fields title,path
 f3api find /de/kontakt/            # an internal link's page, then as above
 ```
 
@@ -126,7 +126,7 @@ Put all operations into one file, parents before children:
 
 ```json
 {"operations": [
-  {"op": "create", "resource": "pages", "ref": "angebot",
+  {"op": "create", "resource": "pages.page", "ref": "angebot",
    "fields": {"title": "Notre offre", "slug": "offre", "parent": 5,
               "language_code": "fr", "translation_of": 17,
               "page_type": "standard", "is_active": false},
@@ -135,7 +135,7 @@ Put all operations into one file, parents before children:
      {"type": "pages.button", "depth": 0, "fields": {"button_label": "Contact",
                                                      "button_page": 45}}
    ]}},
-  {"op": "create", "resource": "pages",
+  {"op": "create", "resource": "pages.page",
    "fields": {"title": "Formations", "slug": "formations",
               "parent": {"type": "pages.page", "id": {"ref": "angebot"}},
               "language_code": "fr", "translation_of": 18,
@@ -175,12 +175,12 @@ before applying.
 
 ## 8. Updating an existing translation
 
-Only when asked. Read both (`f3api get pages 17`, `f3api get pages 31`),
+Only when asked. Read both (`f3api get pages.page 17`, `f3api get pages.page 31`),
 translate what changed in the source, and write the target:
 
 ```bash
-f3api update pages 31 changes.json                # dry run
-f3api update pages 31 changes.json --apply
+f3api update pages.page 31 changes.json                # dry run
+f3api update pages.page 31 changes.json --apply
 ```
 
 `f3api` sends the ETag of what it read, so a change an editor made in the

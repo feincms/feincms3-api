@@ -398,11 +398,23 @@ def get(resource, id, nested, expand):
 
 @cli.command()
 @click.argument("path")
-@click.option("--resource", default="pages", show_default=True)
+@click.option(
+    "--resource", help="Default: the resource with paths, if there is only one."
+)
 @click.option("--host")
 def find(path, resource, host):
     """An object by its path."""
     client, etags = connect()
+    if resource is None:
+        _status, schema = client.request("GET", "schema/")
+        names = [r["name"] for r in schema["resources"] if r.get("findable")]
+        if len(names) != 1:
+            raise CommandError(
+                "Name the resource with --resource"
+                f" ({', '.join(names) or 'none has paths'}).",
+                USAGE,
+            )
+        resource = names[0]
     _status, data = client.request(
         "GET", f"resources/{resource}/find/", params={"path": path, "host": host}
     )

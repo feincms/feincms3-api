@@ -139,8 +139,8 @@ class Resource:
     """
     A model exposed through the API
 
-    ``name`` is its URL segment (default: the model name with an ``s``,
-    e.g. ``articles``), ``admin_site`` the admin site its
+    ``name`` is its URL segment (default: its type, the model's
+    ``app_label.model_name``, e.g. ``pages.page``), ``admin_site`` the admin site its
     ``ModelAdmin`` is registered with.
     """
 
@@ -164,7 +164,7 @@ class Resource:
     ):
         self.model = model
         # Not the verbose name: URLs mustn't change with the language.
-        self.name = name or f"{model._meta.model_name}s"
+        self.name = name or label(model)
         self.admin_site = admin_site or admin.site
         self.title_field = title_field
         if filters is not None:

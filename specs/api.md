@@ -162,7 +162,7 @@ region) need nothing special: their regions are regions.
 
 ## The wire format
 
-One object, as `GET /resources/pages/17/` returns it:
+One object, as `GET /resources/pages.page/17/` returns it:
 
 ```json
 {
@@ -346,7 +346,7 @@ pages.jsonplugin_key_figures (plugin of pages.page)
   data.title: text
   data.figures[].title: text
   data.figures[].number: number
-pages.page (resource pages)
+pages.page (resource)
   parent: ref pages.page
   page_type: choice
   title: text
@@ -364,16 +364,18 @@ gets every field read-only, as the admin shows it.
 ## Endpoints
 
 Under the project's mount point, `{resource}` being the resource's name
-(`pages`, `articles`, …, default: the model name with an `s`, or `name=`;
-not the verbose name, which changes with the language). The resources are
-below `resources/`, a namespace of their own: the first segment of a path
+(default: the type, `app_label.model_name`, e.g. `pages.page`, or
+`name=`; not the verbose name, which changes with the language). The type
+is unique where a model name isn't (a `Category` in two apps), and needs
+no plural, which an appended `s` gets wrong (`categorys`). The resources
+are below `resources/`, a namespace of their own: the first segment of a path
 is always the API's, so a resource can take any name (`tokens`, `schema`)
 and new routes of the API never collide with a project's resources. A
 path which starts with a resource's name answers where the resource is.
 
 | | |
 |---|---|
-| `GET /schema/` | resources (with their `filters` and whether `q` works, `search`), their types, regions per template/page type, allowed plugins per region, container plugins |
+| `GET /schema/` | resources (with their `filters`, whether `q` works, `search`, and whether `find/` does, `findable`), their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
 | `GET /resources/{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`; a `400` if it has none, rather than everything), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
 | `POST /resources/{resource}/` | create, with or without `content` |
@@ -384,7 +386,7 @@ path which starts with a resource's name answers where the resource is.
 | `PATCH /resources/{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
 | `DELETE /resources/{resource}/{id}/` | delete |
 | `DELETE /resources/{resource}/{id}/cache/` | delete the cached rendering, see below |
-| `GET /resources/pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
+| `GET /resources/pages.page/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `POST /batch/` | several writes in one transaction, see "Batches" |
 | `GET /tokens/`, `DELETE /tokens/{id}/`, `DELETE /tokens/current/` | the user's tokens, revoking one, see "Authentication and permissions" |
@@ -511,18 +513,18 @@ none, and `?dry_run=true` rolls all of them back:
 
 ```json
 {"operations": [
-  {"op": "create", "resource": "pages", "ref": "section",
+  {"op": "create", "resource": "pages.page", "ref": "section",
    "fields": {"title": "Bereich", "parent": 3, …}},
-  {"op": "create", "resource": "pages",
+  {"op": "create", "resource": "pages.page",
    "fields": {"parent": {"type": "pages.page", "id": {"ref": "section"}}, …},
    "content": {"main": […]}},
-  {"op": "update", "resource": "pages", "id": {"ref": "section"},
+  {"op": "update", "resource": "pages.page", "id": {"ref": "section"},
    "fields": {"is_active": true}},
-  {"op": "update", "resource": "pages", "id": 12, "etag": "…", "fields": {…}},
-  {"op": "replace_content", "resource": "pages", "id": 12, "content": {…}},
-  {"op": "update_plugin", "resource": "pages", "id": 12,
+  {"op": "update", "resource": "pages.page", "id": 12, "etag": "…", "fields": {…}},
+  {"op": "replace_content", "resource": "pages.page", "id": 12, "content": {…}},
+  {"op": "update_plugin", "resource": "pages.page", "id": 12,
    "plugin": {"type": "pages.button", "id": 7}, "fields": {…}},
-  {"op": "delete", "resource": "articles", "id": 3, "etag": "…"}
+  {"op": "delete", "resource": "articles.article", "id": 3, "etag": "…"}
 ]}
 ```
 
@@ -625,11 +627,11 @@ Nothing cabinet-specific is needed for files: they go through cabinet's
 file admin like any resource, and their `image_file` and `download_file`
 fields take uploads. Cabinet's own validation (exactly one file) applies.
 
-- `POST /resources/files/` with `{"fields": {"folder": …, "image_file": {"upload":
+- `POST /resources/cabinet.file/` with `{"fields": {"folder": …, "image_file": {"upload":
   "<id>"}, "image_alt_text": …}}`; `?folder=` filters the list.
-- `PATCH /resources/files/{id}/` changes metadata; a new `upload` replaces the file
+- `PATCH /resources/cabinet.file/{id}/` changes metadata; a new `upload` replaces the file
   under the same id where the model has cabinet's `OverwriteMixin`.
-- `DELETE /resources/files/{id}/` of a file still in use returns `409` with the
+- `DELETE /resources/cabinet.file/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
 - Listing unused files is left to cabinet: going by foreign keys, the API
   can't tell an unused file from one whose URL is used elsewhere (in rich

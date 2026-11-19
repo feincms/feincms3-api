@@ -6,6 +6,11 @@
   (`/api/resources/pages/17/`), so that a resource can take any name,
   also `schema`, `uploads`, `batch` or `tokens` (#22). A path starting with
   a resource's name answers where it is now.
+- **Backwards incompatible:** a resource's name defaults to its type,
+  `app_label.model_name` (`pages.page` instead of `pages`): unique, and no
+  English pluralizing. cabinet's resources are `cabinet.file` and
+  `cabinet.folder`. Names are checked to be URL segments.
+- `/schema/` says which resources can find objects by path (`findable`).
 - The CLI's change log has a title of its own in the docs' navigation.
 
 ## 0.4 (2026-11-19)

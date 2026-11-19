@@ -86,20 +86,22 @@ class CLITest(LiveServerTestCase):
     def test_read(self):
         code, data, _err = self.run_cli("resources")
         self.assertEqual(code, 0)
-        self.assertIn("pages", [r["name"] for r in data])
-        code, data, _err = self.run_cli("list", "pages", "-f", "language_code=de")
+        self.assertIn("testapp.page", [r["name"] for r in data])
+        code, data, _err = self.run_cli(
+            "list", "testapp.page", "-f", "language_code=de"
+        )
         self.assertEqual(data["count"], 1)
         code, data, _err = self.run_cli("find", "/de/")
         self.assertEqual(data["id"], self.home.pk)
-        code, data, err = self.run_cli("get", "pages", 0)
+        code, data, err = self.run_cli("get", "testapp.page", 0)
         self.assertEqual(code, 5)
         self.assertIn("404", err)
         code, data, err = self.run_cli("list", "page")
         self.assertEqual(code, 5)
-        self.assertIn("No resource 'page'. The resources: pages,", err)
+        self.assertIn("No resource 'page'. The resources: testapp.page,", err)
 
     def test_tables(self):
-        code, out, err = self.run_cli("list", "pages", tty=True)
+        code, out, err = self.run_cli("list", "testapp.page", tty=True)
         self.assertEqual(code, 0, err)
         self.assertIn("Startseite", out)
         self.assertIn("/de/", out)
@@ -107,11 +109,11 @@ class CLITest(LiveServerTestCase):
         code, out, _err = self.run_cli("resources", tty=True)
         self.assertIn("testapp.page", out)
         # JSON when asked for
-        code, out, _err = self.run_cli("list", "pages", "--json", tty=True)
+        code, out, _err = self.run_cli("list", "testapp.page", "--json", tty=True)
         self.assertEqual(json.loads(out)["count"], 1)
 
     def test_usage(self):
-        code, _data, err = self.run_cli("get", "pages")
+        code, _data, err = self.run_cli("get", "testapp.page")
         self.assertEqual(code, 2)
         self.assertIn("Missing argument", err)
         code, out, _err = self.run_cli("--help", tty=True)
@@ -122,20 +124,22 @@ class CLITest(LiveServerTestCase):
         page = f"{self.home.pk}"
         body = '{"fields": {"title": "Neu"}}'
         # Not read yet: no ETag
-        code, _data, err = self.run_cli("update", "pages", page, stdin=body)
+        code, _data, err = self.run_cli("update", "testapp.page", page, stdin=body)
         self.assertEqual(code, 4)
         self.assertIn("read it first", err)
 
-        self.run_cli("get", "pages", page)
+        self.run_cli("get", "testapp.page", page)
         # A dry run by default
-        code, data, err = self.run_cli("update", "pages", page, stdin=body)
+        code, data, err = self.run_cli("update", "testapp.page", page, stdin=body)
         self.assertEqual(code, 0, err)
         self.assertEqual(data["fields"]["title"], "Neu")
         self.assertIn("dry run", err)
         self.home.refresh_from_db()
         self.assertEqual(self.home.title, "Startseite")
 
-        code, _data, err = self.run_cli("update", "pages", page, "--apply", stdin=body)
+        code, _data, err = self.run_cli(
+            "update", "testapp.page", page, "--apply", stdin=body
+        )
         self.assertEqual(code, 0, err)
         self.home.refresh_from_db()
         self.assertEqual(self.home.title, "Neu")
@@ -143,7 +147,7 @@ class CLITest(LiveServerTestCase):
         # The new ETag was remembered, so writing again works
         code, _data, err = self.run_cli(
             "update-plugin",
-            "pages",
+            "testapp.page",
             page,
             "testapp.button",
             self.button.pk,
@@ -156,13 +160,15 @@ class CLITest(LiveServerTestCase):
 
         # Someone else changes the page: the remembered ETag is outdated
         Page.objects.filter(pk=self.home.pk).update(title="Anders")
-        code, _data, err = self.run_cli("update", "pages", page, "--apply", stdin=body)
+        code, _data, err = self.run_cli(
+            "update", "testapp.page", page, "--apply", stdin=body
+        )
         self.assertEqual(code, 4)
         self.assertIn("412", err)
 
     def test_errors_with_paths(self):
         code, _data, err = self.run_cli(
-            "create", "pages", stdin='{"fields": {"title": ""}}'
+            "create", "testapp.page", stdin='{"fields": {"title": ""}}'
         )
         self.assertEqual(code, 3)
         self.assertIn("fields.title:", err)
@@ -172,7 +178,7 @@ class CLITest(LiveServerTestCase):
         operations = [
             {
                 "op": "create",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "ref": "a",
                 "fields": {
                     "title": "Neu",
@@ -185,7 +191,7 @@ class CLITest(LiveServerTestCase):
             },
             {
                 "op": "update",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "id": {"ref": "a"},
                 "fields": {"title": "Neuer"},
             },
@@ -197,7 +203,7 @@ class CLITest(LiveServerTestCase):
         self.assertEqual(page.title, "Neuer")
         # Remembered: can be updated without reading it again
         code, _data, err = self.run_cli(
-            "update", "pages", page.pk, stdin='{"fields": {"title": "X"}}'
+            "update", "testapp.page", page.pk, stdin='{"fields": {"title": "X"}}'
         )
         self.assertEqual(code, 0, err)
 
@@ -229,7 +235,7 @@ class CLITest(LiveServerTestCase):
             config = Path(self.dirs.name) / "config" / "sites.json"
             self.assertEqual(config.stat().st_mode & 0o777, 0o600)
             with mock.patch.dict(os.environ, {"F3API_TOKEN": ""}):
-                code, data, err = self.run_cli("list", "pages")
+                code, data, err = self.run_cli("list", "testapp.page")
             self.assertEqual(code, 0, err)
             self.assertEqual(
                 (Path(self.dirs.name) / "config").stat().st_mode & 0o777, 0o700
@@ -239,7 +245,7 @@ class CLITest(LiveServerTestCase):
         with mock.patch.dict(
             os.environ, {"F3API_URL": "http://127.0.0.1:1/", "F3API_TOKEN": "x"}
         ):
-            code, data, err = self.run_cli("--site", "here", "list", "pages")
+            code, data, err = self.run_cli("--site", "here", "list", "testapp.page")
         self.assertEqual(code, 0, err)
 
     def test_tokens_and_logout(self):
@@ -288,21 +294,21 @@ class CLITest(LiveServerTestCase):
 
     def test_transport_errors(self):
         with mock.patch.dict(os.environ, {"F3API_URL": "http://127.0.0.1:1/"}):
-            code, _data, err = self.run_cli("list", "pages")
+            code, _data, err = self.run_cli("list", "testapp.page")
         self.assertEqual(code, 1)
         self.assertIn("Can't connect", err)
         # The admin redirects to its login: not followed
         with mock.patch.dict(
             os.environ, {"F3API_URL": f"{self.live_server_url}/admin/"}
         ):
-            code, _data, err = self.run_cli("list", "pages")
+            code, _data, err = self.run_cli("list", "testapp.page")
         self.assertEqual(code, 1)
         self.assertIn("redirected to", err)
         # Not the API: no HTML error pages
         with mock.patch.dict(
             os.environ, {"F3API_URL": f"{self.live_server_url}/nothing/"}
         ):
-            code, _data, err = self.run_cli("list", "pages")
+            code, _data, err = self.run_cli("list", "testapp.page")
         self.assertEqual(code, 5)
         self.assertIn("404 Not Found (http", err)
         self.assertNotIn("<", err)
@@ -311,7 +317,7 @@ class CLITest(LiveServerTestCase):
         operations = [
             {
                 "op": "create",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "ref": "a",
                 "fields": {
                     "title": "Weg",
@@ -322,7 +328,7 @@ class CLITest(LiveServerTestCase):
                     "is_active": False,
                 },
             },
-            {"op": "delete", "resource": "pages", "id": {"ref": "a"}},
+            {"op": "delete", "resource": "testapp.page", "id": {"ref": "a"}},
         ]
         code, data, err = self.run_cli("batch", "--apply", stdin=json.dumps(operations))
         self.assertEqual(code, 0, err)
@@ -331,13 +337,13 @@ class CLITest(LiveServerTestCase):
         self.assertFalse(any(key.endswith(f"/{data['refs']['a']}") for key in cache))
 
     def test_content_wrapped_or_not(self):
-        self.run_cli("get", "pages", self.home.pk)
+        self.run_cli("get", "testapp.page", self.home.pk)
         regions = {
             "main": [{"type": "testapp.richtext", "fields": {"text": "<p>A</p>"}}]
         }
         for body in [regions, {"content": regions}]:
             code, data, err = self.run_cli(
-                "content", "pages", self.home.pk, stdin=json.dumps(body)
+                "content", "testapp.page", self.home.pk, stdin=json.dumps(body)
             )
             self.assertEqual(code, 0, err)
             self.assertEqual(
@@ -511,8 +517,8 @@ class SkillsTest(SimpleTestCase):
             ],
             [["list", "pages"]],
         )
-        self.assertEqual(parses(["get", "pages", "1", "--expand"])[0], 0)
-        self.assertEqual(parses(["get", "pages", "1", "--expanded"])[0], 2)
+        self.assertEqual(parses(["get", "testapp.page", "1", "--expand"])[0], 0)
+        self.assertEqual(parses(["get", "testapp.page", "1", "--expanded"])[0], 2)
 
     def test_skills_parse(self):
         """A renamed option can't silently break a skill"""

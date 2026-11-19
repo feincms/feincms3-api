@@ -26,13 +26,13 @@ class BatchTest(WriteTestCase):
         return [
             {
                 "op": "create",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "ref": "section",
                 "fields": page("Bereich", "bereich", self.home.pk),
             },
             {
                 "op": "create",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "ref": "child",
                 "fields": page(
                     "Unterseite",
@@ -48,7 +48,7 @@ class BatchTest(WriteTestCase):
             {
                 # Written earlier in the batch: no ETag needed
                 "op": "update",
-                "resource": "pages",
+                "resource": "testapp.page",
                 "id": {"ref": "section"},
                 "fields": {"title": "Ein Bereich"},
             },
@@ -101,10 +101,10 @@ class BatchTest(WriteTestCase):
         self.assertEqual(Page.objects.count(), count)
 
     def test_etags(self):
-        path = f"resources/pages/{self.angebot.pk}/"
+        path = f"resources/testapp.page/{self.angebot.pk}/"
         operation = {
             "op": "update",
-            "resource": "pages",
+            "resource": "testapp.page",
             "id": self.angebot.pk,
             "fields": {"title": "Neu"},
         }
@@ -120,13 +120,13 @@ class BatchTest(WriteTestCase):
                 # one read before the batch is ignored.
                 {
                     "op": "replace_content",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "id": self.angebot.pk,
                     "content": {"main": []},
                 },
                 {
                     "op": "update",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "id": self.angebot.pk,
                     "etag": etag,
                     "fields": {"title": "Neuer"},
@@ -142,12 +142,12 @@ class BatchTest(WriteTestCase):
         self.assertEqual(response.status_code, 412)
 
     def test_plugin_and_delete(self):
-        etag = self.etag(f"resources/pages/{self.angebot.pk}/")
+        etag = self.etag(f"resources/testapp.page/{self.angebot.pk}/")
         response = self.batch(
             [
                 {
                     "op": "update_plugin",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "id": self.angebot.pk,
                     "etag": etag,
                     "plugin": {"type": "testapp.button", "id": self.button.pk},
@@ -155,9 +155,9 @@ class BatchTest(WriteTestCase):
                 },
                 {
                     "op": "delete",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "id": self.fr.pk,
-                    "etag": self.etag(f"resources/pages/{self.fr.pk}/"),
+                    "etag": self.etag(f"resources/testapp.page/{self.fr.pk}/"),
                 },
             ]
         )
@@ -171,20 +171,20 @@ class BatchTest(WriteTestCase):
     def test_shape(self):
         response = self.batch(
             [
-                {"op": "rename", "resource": "pages"},
-                {"op": "update", "resource": "pages", "title": "X"},
-                {"op": "create", "resource": "pages", "ref": "a"},
-                {"op": "create", "resource": "pages", "ref": "a"},
+                {"op": "rename", "resource": "testapp.page"},
+                {"op": "update", "resource": "testapp.page", "title": "X"},
+                {"op": "create", "resource": "testapp.page", "ref": "a"},
+                {"op": "create", "resource": "testapp.page", "ref": "a"},
                 {
                     "op": "update_plugin",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "id": 1,
                     "plugin": 1,
                     "fields": {},
                 },
                 "delete",
-                {"op": [], "resource": "pages"},
-                {"op": "create", "resource": "pages", "ref": []},
+                {"op": [], "resource": "testapp.page"},
+                {"op": "create", "resource": "testapp.page", "ref": []},
                 {"op": "create", "resource": []},
             ]
         )
@@ -211,7 +211,7 @@ class BatchTest(WriteTestCase):
             [
                 {
                     "op": "create",
-                    "resource": "pages",
+                    "resource": "testapp.page",
                     "fields": page("X", "x", {"ref": "later"}),
                 }
             ]
@@ -223,7 +223,7 @@ class BatchTest(WriteTestCase):
 
     def test_errors_of_operations(self):
         response = self.batch(
-            [{"op": "delete", "resource": "pages", "id": 0, "etag": "*"}]
+            [{"op": "delete", "resource": "testapp.page", "id": 0, "etag": "*"}]
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["operation"], 0)

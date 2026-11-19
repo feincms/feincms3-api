@@ -3,7 +3,7 @@ from testapp.test_write import WriteTestCase
 
 
 class PagesTest(WriteTestCase):
-    def find(self, resource="pages", **params):
+    def find(self, resource="testapp.page", **params):
         return self.client.get(f"/api/resources/{resource}/find/", params)
 
     def test_find(self):
@@ -15,7 +15,7 @@ class PagesTest(WriteTestCase):
         self.assertEqual(self.find(path="/de/nichts/").status_code, 404)
         self.assertEqual(self.find().status_code, 404)
         # Only pages
-        self.assertEqual(self.find("articles", path="/de/").status_code, 404)
+        self.assertEqual(self.find("testapp.article", path="/de/").status_code, 404)
 
     def test_move(self):
         about = Page.objects.create(
@@ -32,7 +32,7 @@ class PagesTest(WriteTestCase):
             language_code="de",
             page_type="standard",
         )
-        path = f"resources/pages/{self.angebot.pk}/"
+        path = f"resources/testapp.page/{self.angebot.pk}/"
         response = self.send(
             "patch",
             path,
@@ -64,13 +64,15 @@ class PagesTest(WriteTestCase):
             page_type="standard",
             translation_of=self.angebot,
         )
-        data = self.get("resources/pages/", translation_of=self.angebot.pk).json()
+        data = self.get(
+            "resources/testapp.page/", translation_of=self.angebot.pk
+        ).json()
         self.assertEqual([item["id"] for item in data["items"]], [self.fr_angebot.pk])
 
     def test_path_clash(self):
         response = self.send(
             "post",
-            "resources/pages/",
+            "resources/testapp.page/",
             {
                 "fields": {
                     "title": "Angebot",

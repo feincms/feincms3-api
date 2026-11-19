@@ -8,6 +8,8 @@ management commands and other code can use them without HTTP, also several
 of them in one transaction.
 """
 
+import re
+
 from django.utils.functional import cached_property
 from ninja import NinjaAPI
 
@@ -37,6 +39,11 @@ class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin, BatchMixin):
     def register(self, resource):
         if "router" in self.__dict__:
             raise RuntimeError("Register resources before using the router.")
+        if not re.fullmatch(r"[\w.-]+", resource.name):
+            raise ValueError(
+                f"The resource name {resource.name!r} has characters other than"
+                " letters, digits, _, . and -."
+            )
         if resource.name in self._resources:
             raise ValueError(f"The resource name {resource.name!r} is taken.")
         self._resources[resource.name] = resource

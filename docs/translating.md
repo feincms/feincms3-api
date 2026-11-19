@@ -13,7 +13,7 @@ objects with a region per language, and a report for the editors.
 ## 1. Read the source and the schema
 
 ```bash
-f3api get pages 17 --expand > source.json        # fields, content, meta.references
+f3api get pages.page 17 --expand > source.json        # fields, content, meta.references
 f3api schema pages.page                           # the page's fields
 f3api schema pages.richtext                       # each plugin type used
 ```
@@ -37,7 +37,7 @@ References (`{"type", "id"}`, and the bare ids JSON data marks with
 language. Find each one's counterpart:
 
 ```bash
-f3api list pages -f translation_of=44 -f language_code=fr --fields title,path
+f3api list pages.page -f translation_of=44 -f language_code=fr --fields title,path
 f3api find /de/kontakt/                           # a link's page, then as above
 ```
 
@@ -54,7 +54,7 @@ The parent of a translated page is the counterpart of the source's parent
 
 ```json
 {"operations": [
-  {"op": "create", "resource": "pages", "ref": "angebot",
+  {"op": "create", "resource": "pages.page", "ref": "angebot",
    "fields": {"title": "Notre offre", "slug": "offre", "parent": 5,
               "language_code": "fr", "translation_of": 17,
               "page_type": "standard", "is_active": false},
@@ -63,7 +63,7 @@ The parent of a translated page is the counterpart of the source's parent
      {"type": "pages.button", "fields": {"button_label": "Contact",
                                          "button_page": 45}}
    ]}},
-  {"op": "create", "resource": "pages",
+  {"op": "create", "resource": "pages.page",
    "fields": {"title": "…", "parent": {"type": "pages.page", "id": {"ref": "angebot"}},
               "translation_of": 18, "language_code": "fr", "is_active": false}}
 ]}
@@ -82,6 +82,6 @@ f3api batch translation.json --apply    # all of it, or nothing
 ## Updating an existing translation
 
 Read both, translate what changed in the source, and write the target with
-`f3api update pages <id> --apply` (the ETag of what was read is sent, so a
+`f3api update pages.page <id> --apply` (the ETag of what was read is sent, so a
 change an editor made in the meantime isn't overwritten). `content`
 replaces whole regions; `update-plugin` changes one plugin.

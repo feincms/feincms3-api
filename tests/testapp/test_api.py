@@ -105,7 +105,7 @@ class APITestCase(TestCase):
 
 class ReadTest(APITestCase):
     def test_list(self):
-        response = self.get("resources/pages/")
+        response = self.get("resources/testapp.page/")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["count"], 3)
@@ -116,43 +116,45 @@ class ReadTest(APITestCase):
         self.assertNotIn("content", data["items"][0])
 
     def test_list_filters_and_paging(self):
-        data = self.get("resources/pages/", language_code="de").json()
+        data = self.get("resources/testapp.page/", language_code="de").json()
         self.assertEqual(data["count"], 2)
 
-        data = self.get("resources/pages/", is_active="false").json()
+        data = self.get("resources/testapp.page/", is_active="false").json()
         self.assertEqual([item["id"] for item in data["items"]], [self.angebot.pk])
 
-        data = self.get("resources/pages/", parent=self.home.pk).json()
+        data = self.get("resources/testapp.page/", parent=self.home.pk).json()
         self.assertEqual([item["id"] for item in data["items"]], [self.angebot.pk])
 
-        data = self.get("resources/pages/", parent="null").json()
+        data = self.get("resources/testapp.page/", parent="null").json()
         self.assertEqual(data["count"], 2)
 
-        data = self.get("resources/pages/", q="angeb").json()
+        data = self.get("resources/testapp.page/", q="angeb").json()
         self.assertEqual([item["id"] for item in data["items"]], [self.angebot.pk])
 
         # The admin of persons has no search_fields: an error, not everything
-        response = self.get("resources/persons/", q="x")
+        response = self.get("resources/testapp.person/", q="x")
         self.assertEqual(response.status_code, 400)
         self.assertIn("can't be searched", response.json()["detail"])
         schema = {r["name"]: r for r in self.get("schema/").json()["resources"]}
-        self.assertEqual(schema["persons"]["search"], False)
-        self.assertEqual(schema["pages"]["search"], True)
-        self.assertIn("parent", schema["pages"]["filters"])
-        self.assertNotIn("parent", schema["persons"]["filters"])
+        self.assertEqual(schema["testapp.person"]["search"], False)
+        self.assertEqual(schema["testapp.page"]["search"], True)
+        self.assertIn("parent", schema["testapp.page"]["filters"])
+        self.assertNotIn("parent", schema["testapp.person"]["filters"])
 
-        data = self.get("resources/pages/", limit=1, offset=1).json()
+        data = self.get("resources/testapp.page/", limit=1, offset=1).json()
         self.assertEqual(data["count"], 3)
         self.assertEqual(len(data["items"]), 1)
 
-        data = self.get("resources/pages/", fields="title,slug").json()
+        data = self.get("resources/testapp.page/", fields="title,slug").json()
         self.assertEqual(set(data["items"][0]["fields"]), {"title", "slug"})
 
-        data = self.get("resources/pages/", content="true", parent=self.home.pk).json()
+        data = self.get(
+            "resources/testapp.page/", content="true", parent=self.home.pk
+        ).json()
         self.assertEqual(len(data["items"][0]["content"]["main"]), 6)
 
     def test_detail(self):
-        response = self.get(f"resources/pages/{self.angebot.pk}/")
+        response = self.get(f"resources/testapp.page/{self.angebot.pk}/")
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
@@ -225,7 +227,7 @@ class ReadTest(APITestCase):
         self.assertEqual(file["url"], f"/media/{file['name']}")
 
     def test_nested(self):
-        response = self.get(f"resources/pages/{self.angebot.pk}/", nested="true")
+        response = self.get(f"resources/testapp.page/{self.angebot.pk}/", nested="true")
         main = response.json()["content"]["main"]
         self.assertEqual(len(main), 5)
         # The container holds the plugin with the greater depth
@@ -246,16 +248,19 @@ class ReadTest(APITestCase):
         )
         # Same object, same ETag
         self.assertEqual(
-            response["ETag"], self.get(f"resources/pages/{self.angebot.pk}/")["ETag"]
+            response["ETag"],
+            self.get(f"resources/testapp.page/{self.angebot.pk}/")["ETag"],
         )
 
     def test_etag_changes(self):
-        etag = self.get(f"resources/pages/{self.angebot.pk}/")["ETag"]
-        self.assertEqual(self.get(f"resources/pages/{self.angebot.pk}/")["ETag"], etag)
+        etag = self.get(f"resources/testapp.page/{self.angebot.pk}/")["ETag"]
+        self.assertEqual(
+            self.get(f"resources/testapp.page/{self.angebot.pk}/")["ETag"], etag
+        )
         self.inner.text = "<p>Andere Antwort</p>"
         self.inner.save()
         self.assertNotEqual(
-            self.get(f"resources/pages/{self.angebot.pk}/")["ETag"], etag
+            self.get(f"resources/testapp.page/{self.angebot.pk}/")["ETag"], etag
         )
 
     def test_regions_per_language_and_excluded_fields(self):
@@ -280,37 +285,37 @@ class ReadTest(APITestCase):
 
     def test_plugin(self):
         data = self.get(
-            f"resources/pages/{self.angebot.pk}/plugins/testapp.jsonplugin_key_figures/{self.figures.pk}/"
+            f"resources/testapp.page/{self.angebot.pk}/plugins/testapp.jsonplugin_key_figures/{self.figures.pk}/"
         ).json()
         self.assertEqual(data["region"], "main")
         self.assertEqual(data["fields"]["data"]["title"], "Zahlen")
 
         # Another page's plugin, another type, a missing one
         for path in [
-            f"resources/pages/{self.home.pk}/plugins/testapp.richtext/{self.text.pk}/",
-            f"resources/pages/{self.angebot.pk}/plugins/testapp.button/99999/",
-            f"resources/pages/{self.angebot.pk}/plugins/testapp.richtext/0/",
+            f"resources/testapp.page/{self.home.pk}/plugins/testapp.richtext/{self.text.pk}/",
+            f"resources/testapp.page/{self.angebot.pk}/plugins/testapp.button/99999/",
+            f"resources/testapp.page/{self.angebot.pk}/plugins/testapp.richtext/0/",
         ]:
             with self.subTest(path=path):
                 self.assertEqual(self.get(path).status_code, 404)
 
     def test_not_found(self):
-        self.assertEqual(self.get("resources/pages/0/").status_code, 404)
-        self.assertEqual(self.get("resources/pages/abc/").status_code, 404)
+        self.assertEqual(self.get("resources/testapp.page/0/").status_code, 404)
+        self.assertEqual(self.get("resources/testapp.page/abc/").status_code, 404)
         # Paths no route matches: JSON, not the site's HTML 404 page
         response = self.get("resources/page/")
         self.assertEqual(response.status_code, 404)
         detail = response.json()["detail"]
         self.assertIn("No resource 'page'.", detail)
-        self.assertIn("pages, articles", detail)
-        self.assertIn("slash", self.get("resources/pages").json()["detail"])
+        self.assertIn("testapp.page, testapp.article", detail)
+        self.assertIn("slash", self.get("resources/testapp.page").json()["detail"])
         self.assertEqual(
-            self.get("resources/pages/1/nothing/").json()["detail"],
-            "Nothing at 'resources/pages/1/nothing/'.",
+            self.get("resources/testapp.page/1/nothing/").json()["detail"],
+            "Nothing at 'resources/testapp.page/1/nothing/'.",
         )
         self.assertEqual(
-            self.get("pages/").json()["detail"],
-            "Nothing at 'pages/'; the resource is at 'resources/pages/'.",
+            self.get("testapp.page/").json()["detail"],
+            "Nothing at 'testapp.page/'; the resource is at 'resources/testapp.page/'.",
         )
         response = self.client.post(
             "/api/resources/nothing/", {}, content_type="application/json"
@@ -319,7 +324,7 @@ class ReadTest(APITestCase):
 
     def test_wrong_region(self):
         RichText.objects.create(parent=self.angebot, region="sidebar", text="<p>x</p>")
-        data = self.get(f"resources/pages/{self.angebot.pk}/").json()
+        data = self.get(f"resources/testapp.page/{self.angebot.pk}/").json()
         self.assertEqual(len(data["content"]["sidebar"]), 1)
         warning = data["meta"]["warnings"][0]
         self.assertIn("'sidebar'", warning["message"])
@@ -328,7 +333,7 @@ class ReadTest(APITestCase):
     def test_article(self):
         article = Article.objects.create(title="News", slug="news", language_code="de")
         ArticleRichText.objects.create(parent=article, region="main", text="<p>a</p>")
-        data = self.get(f"resources/articles/{article.pk}/").json()
+        data = self.get(f"resources/testapp.article/{article.pk}/").json()
         self.assertEqual(data["meta"]["url"], "http://testserver/de/articles/news/")
         self.assertEqual(data["content"]["main"][0]["fields"], {"text": "<p>a</p>"})
 
@@ -336,7 +341,7 @@ class ReadTest(APITestCase):
 class SchemaTest(APITestCase):
     def test_schema(self):
         data = self.get("schema/").json()
-        pages = next(r for r in data["resources"] if r["name"] == "pages")
+        pages = next(r for r in data["resources"] if r["name"] == "testapp.page")
         standard = pages["region_sets"][0]
         self.assertEqual(standard["key"], "standard")
         main = standard["regions"][0]
@@ -408,7 +413,7 @@ class SchemaTest(APITestCase):
 class PermissionTest(APITestCase):
     def test_anonymous(self):
         self.client.logout()
-        self.assertEqual(self.get("resources/pages/").status_code, 401)
+        self.assertEqual(self.get("resources/testapp.page/").status_code, 401)
         self.assertEqual(self.get("schema/").status_code, 401)
         # Unknown paths don't name the resources
         self.assertEqual(self.get("resources/nothing/").status_code, 401)
@@ -416,13 +421,15 @@ class PermissionTest(APITestCase):
     def test_not_staff(self):
         user = User.objects.create_user("user", "", "user")
         self.client.force_login(user)
-        self.assertEqual(self.get("resources/pages/").status_code, 401)
+        self.assertEqual(self.get("resources/testapp.page/").status_code, 401)
 
     def test_staff_without_permissions(self):
         user = User.objects.create_user("staff", "", "staff", is_staff=True)
         self.client.force_login(user)
-        self.assertEqual(self.get("resources/pages/").status_code, 403)
-        self.assertEqual(self.get(f"resources/pages/{self.home.pk}/").status_code, 403)
+        self.assertEqual(self.get("resources/testapp.page/").status_code, 403)
+        self.assertEqual(
+            self.get(f"resources/testapp.page/{self.home.pk}/").status_code, 403
+        )
         self.assertEqual(self.get("schema/").json()["resources"], [])
 
     def test_staff_with_page_permissions_only(self):
@@ -433,11 +440,11 @@ class PermissionTest(APITestCase):
             )
         )
         self.client.force_login(user)
-        data = self.get(f"resources/pages/{self.angebot.pk}/").json()
+        data = self.get(f"resources/testapp.page/{self.angebot.pk}/").json()
         # Viewing only: the fields are there, read-only
         self.assertEqual(data["fields"]["title"], "Angebot")
         schema = self.get("schema/testapp.page/").json()
         self.assertIs(schema["properties"]["title"]["readOnly"], True)
         # No permissions for the plugins: none of them are shown
         self.assertNotIn("content", data)
-        self.assertEqual(self.get("resources/articles/").status_code, 403)
+        self.assertEqual(self.get("resources/testapp.article/").status_code, 403)

@@ -87,8 +87,10 @@ model is:
 
 Every resource takes these arguments:
 
-- `name=`: the URL segment, `articles` for `Article` by default. Set it when
-  the default reads badly (`ObjectResource(TabList, name="tab-lists")`).
+- `name=`: the URL segment, by default the model's type
+  (`app_label.model_name`, e.g. `app.article`), which is unique. Set it
+  when you prefer another (`ObjectResource(TabList, name="tab-lists")`);
+  letters, digits, `_`, `.` and `-`.
 - `filters=`: the fields lists can be filtered by, replacing the class's
   `filter_fields` (`language_code`, `is_active`, `translation_of` and
   `site`, where the model has them, plus `parent`, `page_type` and `path`
@@ -119,7 +121,7 @@ and what kind of value each is, as a superuser sees them:
 ```
 
 ```text
-app.article (resource articles)
+app.article (resource)
   is_active: boolean
   title: text
   slug: machine
@@ -237,7 +239,7 @@ class Pages(PageResource):
         return {**super().describe(request, obj), "page_type": obj.page_type}
 
     def cache_keys(self, request, obj):
-        """What ``DELETE /resources/pages/{id}/cache/`` deletes"""
+        """What ``DELETE /resources/pages.page/{id}/cache/`` deletes"""
         return [*super().cache_keys(request, obj), f"navigation-{obj.language_code}"]
 
 

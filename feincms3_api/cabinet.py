@@ -21,7 +21,6 @@ class FileResource(ObjectResource):
     filter_fields = ("folder",)
 
     def __init__(self, **kwargs):
-        kwargs.setdefault("name", "files")
         super().__init__(get_file_model(), **kwargs)
 
     def url(self, request, obj):
@@ -55,7 +54,6 @@ class FolderResource(ObjectResource):
     filter_fields = ("parent",)
 
     def __init__(self, **kwargs):
-        kwargs.setdefault("name", "folders")
         super().__init__(Folder, **kwargs)
 
     @cached_property

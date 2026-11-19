@@ -1,4 +1,4 @@
-cabinet.file (resource files)
+cabinet.file (resource)
   folder: ref cabinet.folder
   caption: text
   copyright: text
@@ -7,12 +7,12 @@ cabinet.file (resource files)
   image_alt_text: text
   download_file: file
   _overwrite: boolean
-cabinet.folder (resource folders)
+cabinet.folder (resource)
   parent: ref cabinet.folder
   name: text
 testapp.accordion (plugin of testapp.page, container)
   title: text
-testapp.article (resource articles)
+testapp.article (resource)
   language_code: choice
   translation_of: ref testapp.article
   is_active: boolean
@@ -32,7 +32,7 @@ testapp.button (plugin of testapp.page)
   style: choice
   button_url: link
   button_page: ref testapp.page
-testapp.chapter (resource chapters)
+testapp.chapter (resource)
   parent: ref testapp.chapter
   textbook: ref testapp.textbook
   title: text
@@ -45,7 +45,7 @@ testapp.contact (plugin of testapp.page)
 testapp.download (plugin of testapp.page)
   file: file
   caption: text
-testapp.form (resource forms)
+testapp.form (resource)
   name: text
   form_type: choice
   language_code: choice
@@ -72,7 +72,7 @@ testapp.jsonplugin_page_teaser (plugin of testapp.page)
   data: json
   data.title: text
   data.page: ref testapp.page
-testapp.page (resource pages)
+testapp.page (resource)
   parent: ref testapp.page
   position: integer
   menu: choice
@@ -89,7 +89,7 @@ testapp.page (resource pages)
   path: machine (read-only)
   region standard.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
   region articles.main: testapp.richtext, testapp.button, testapp.formcontainer, testapp.tablistelement, testapp.contact, testapp.accordion, testapp.download, testapp.jsonplugin_key_figures, testapp.jsonplugin_page_teaser
-testapp.person (resource persons)
+testapp.person (resource)
   name: text
   role_de: text
   role_fr: text
@@ -135,9 +135,9 @@ testapp.tablist (resource tab-lists)
   region it: testapp.tab
 testapp.tablistelement (plugin of testapp.page)
   tab_list: ref testapp.tablist
-testapp.textbook (resource textbooks)
+testapp.textbook (resource)
   title: text
-testapp.training (resource trainings)
+testapp.training (resource)
   language_code: choice
   is_active: boolean
   title: text

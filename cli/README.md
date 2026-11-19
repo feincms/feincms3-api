@@ -22,7 +22,7 @@ the server:
 f3api sites add example https://example.com/api/   # asks for the token
 f3api sites list
 f3api sites default example
-f3api --site other list pages                      # the first site is the default
+f3api --site other list pages.page                      # the first site is the default
 ```
 
 `F3API_URL` and `F3API_TOKEN` replace the default site (not one named with
@@ -51,10 +51,10 @@ file (scripts, agents):
 f3api resources
 f3api schema                       # region sets and the plugins allowed per region
 f3api schema pages.page            # one type's fields
-f3api list pages -f language_code=de -q angebot --fields title,path
-f3api get pages 17 --expand        # with meta.references
-f3api find /de/angebot/
-f3api plugin pages 17 pages.button 103
+f3api list pages.page -f language_code=de -q angebot --fields title,path
+f3api get pages.page 17 --expand   # with meta.references
+f3api find /de/angebot/            # in the resource with paths, or --resource
+f3api plugin pages.page 17 pages.button 103
 ```
 
 ## Writing
@@ -68,18 +68,18 @@ someone changed the object since, instead of overwriting their change.
 Read it again, or pass `--etag` or `--force`.
 
 ```bash
-f3api get pages 17 > page.json
-f3api update pages 17 <<'EOF'
+f3api get pages.page 17 > page.json
+f3api update pages.page 17 <<'EOF'
 {"fields": {"title": "Unser Angebot"}}
 EOF
-f3api update pages 17 changes.json --apply
-f3api content pages 17 regions.json --apply        # replace the regions given
-f3api update-plugin pages 17 pages.button 103 --apply <<'EOF'
+f3api update pages.page 17 changes.json --apply
+f3api content pages.page 17 regions.json --apply        # replace the regions given
+f3api update-plugin pages.page 17 pages.button 103 --apply <<'EOF'
 {"button_label": "Kontakt"}
 EOF
-f3api create pages new-page.json --apply
-f3api delete articles 3 --apply
-f3api cache-clear pages 17
+f3api create pages.page new-page.json --apply
+f3api delete articles.article 3 --apply
+f3api cache-clear pages.page 17
 f3api upload team.jpg              # prints {"upload": "…"} to use in fields
 f3api batch subtree.json --apply   # several writes in one transaction
 ```

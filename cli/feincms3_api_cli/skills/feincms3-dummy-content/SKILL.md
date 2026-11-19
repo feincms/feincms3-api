@@ -108,11 +108,11 @@ content in every region:
 
 ```json
 {"operations": [
-  {"op": "create", "resource": "pages", "ref": "dummy",
+  {"op": "create", "resource": "pages.page", "ref": "dummy",
    "fields": {"title": "Dummy content", "slug": "dummy-content", "parent": 3,
               "page_type": "standard", "language_code": "de",
               "is_active": false}},
-  {"op": "create", "resource": "pages", "ref": "standard",
+  {"op": "create", "resource": "pages.page", "ref": "standard",
    "fields": {"title": "Standard page", "slug": "standard",
               "parent": {"type": "pages.page", "id": {"ref": "dummy"}},
               "page_type": "standard", "language_code": "de",
@@ -161,10 +161,10 @@ Pages with children can't be deleted, so delete bottom-up, the dummy
 root last, then the uploaded files and their folder:
 
 ```bash
-f3api list pages -f parent=40 --fields title,path
-f3api get pages 41
-f3api delete pages 41              # dry run
-f3api delete pages 41 --apply
+f3api list pages.page -f parent=40 --fields title,path
+f3api get pages.page 41
+f3api delete pages.page 41              # dry run
+f3api delete pages.page 41 --apply
 ```
 
 Or all of it in one batch, children first, each `delete` with the `etag`
