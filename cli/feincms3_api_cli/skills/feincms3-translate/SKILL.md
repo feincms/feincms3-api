@@ -79,6 +79,34 @@ f3api list pages.page -f translation_of=17 -f language_code=fr --fields title,pa
 Skip objects which have a translation, and say so; update one only when
 the user asked for it (step 8).
 
+### Every page needs a parent in the target language
+
+A translated page goes below the **counterpart of its source's parent**,
+never below the source's parent itself. A page below a parent in another
+language sits in that language's tree: the target language's navigation
+doesn't find it, and menus built in tree order can fall apart around it.
+(django-tree-queries' admin flags such pages, but only after the fact.)
+
+So before building any operation, find the counterpart of the parent of
+every selected page whose parent isn't selected itself -- for a single
+page, its parent; for a subtree, the subtree's root's parent:
+
+```bash
+f3api get pages.page 17            # its parent, and that parent's translation_of
+f3api list pages.page -f translation_of=PARENT -f language_code=fr --fields title,path
+```
+
+- A top-level page's counterpart parent is the target language's root.
+- If the source isn't in the primary language (`translation_of` only
+  points to objects in the primary language), go through the original:
+  take the source parent's `translation_of`, then that original's
+  translation in the target language, or the original itself when the
+  target is the primary language.
+- **No counterpart: stop and ask.** Offer to translate the missing
+  ancestors too -- added to the batch, parents first, inactive like the
+  rest -- or to put the page below another parent the user names. Never
+  fall back to the source's parent, and don't pick a parent yourself.
+
 ## 4. Turn each source object into a create operation
 
 ```bash
@@ -96,8 +124,8 @@ From what `get` prints, build `{"op": "create", "resource": "pages.page", "ref":
   plugin's `fields` and in `inlines`.
 - **Set** `language_code` to the target, `translation_of` to the source's
   id, `is_active` to `false`, and `parent` to the counterpart of the
-  source's parent (the target language's root for a top-level page; a
-  `{"ref": …}` for a parent created in the same batch).
+  source's parent found in step 3 (a `{"ref": …}` for a parent created in
+  the same batch).
 - **Slug**: from the translated title (lowercase, ASCII, hyphens).
 - **Static paths** (`static_path: true`): don't translate the path; create
   the copy without it and list it for the editors.
@@ -119,7 +147,8 @@ f3api find /de/kontakt/            # an internal link's page, then as above
 
 - A counterpart exists: use its id, or its path for links.
 - It's created in this batch: `{"type": "pages.page", "id": {"ref": "kontakt"}}`.
-- None exists: keep the reference and list it for the editors.
+- None exists: keep the reference and list it for the editors. This is
+  for links and references in the content, **never for `parent`** (step 3).
 - Files (`cabinet.file`) and objects without a language stay as they are.
 
 ## 6. One batch, dry run first
@@ -156,8 +185,10 @@ f3api batch translation.json             # dry run: errors with their paths, war
 ```
 
 Fix what the errors name (`operations[1].fields.slug: …`) and run the dry
-run again until it passes; look at `meta.warnings` too. Then show the user
-what will be created and apply only when they agree:
+run again until it passes; look at `meta.warnings` too. Check that every
+create's `parent` is in the target language (a `ref` in the batch, or an
+id step 3 found). Then show the user what will be created and apply only
+when they agree:
 
 ```bash
 f3api batch translation.json --apply     # all of it, or nothing
@@ -207,5 +238,7 @@ batch at the end, so it's all or nothing.
 - What was created (title, path, `meta.admin_url` from the batch result),
   inactive, to be reviewed and activated in the admin.
 - What was skipped because it was translated already.
+- Ancestors translated along because the target language had no parent
+  for a page, if any.
 - References and links which couldn't be mapped, and static paths, for
   the editors.

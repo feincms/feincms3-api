@@ -2,6 +2,13 @@
 
 ## Next version
 
+- The translate skill spells out that a translated page needs a parent in
+  the target language: when the source's parent has no counterpart there,
+  it asks, offering to translate the missing ancestors too, instead of
+  leaving room to keep the source's parent like an unmapped reference. It
+  also finds counterparts through the original when the source isn't in
+  the primary language.
+
 ## 0.5 (2026-11-19)
 
 - Needs feincms3-api 0.5 or later on the server (the resources are below
