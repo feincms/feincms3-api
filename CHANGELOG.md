@@ -2,6 +2,9 @@
 
 ## Next version
 
+- Writes reject unknown keys in the body (`"Unknown key."`) instead of
+  ignoring them: `{"title": "x"}` instead of `{"fields": {"title": "x"}}`
+  reported success without changing anything.
 - Fixed writing `JSONField`s: `{}` and `[]` ended up as `null` (the form
   field takes them for empty), so saving failed for fields with
   `default=dict`, also when the field wasn't part of the change. JSON is

@@ -216,6 +216,22 @@ class UpdateTest(WriteTestCase):
         response = self.send("patch", path, {"fields": {"title": "x"}}, etag=etag)
         self.assertEqual(response.status_code, 412)
 
+    def test_unknown_keys(self):
+        """Fields outside of ``fields`` aren't silently dropped"""
+        path = f"resources/testapp.page/{self.angebot.pk}/"
+        response = self.send("patch", path, {"title": "x"}, etag=self.etag(path))
+        self.assertEqual(response.status_code, 422, response.content)
+        self.assertIn("title", response.content.decode())
+
+        plugin = self.angebot.testapp_richtext_set.first()
+        response = self.send(
+            "patch",
+            f"{path}plugins/testapp.richtext/{plugin.pk}/",
+            {"fields": {}, "text": "x"},
+            etag=self.etag(path),
+        )
+        self.assertEqual(response.status_code, 422, response.content)
+
     def test_round_trip(self):
         """What was read can be written back, read-only fields included"""
         path = f"resources/testapp.page/{self.angebot.pk}/"

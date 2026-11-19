@@ -150,8 +150,21 @@ class Components:
         }
         if validator is None:
             return core_schema.dict_schema(ref=name, metadata=metadata)
-        return core_schema.no_info_after_validator_function(
-            lambda value: value.model_dump(exclude_unset=True),
+
+        def validate(value, handler):
+            data = handler(value).model_dump(exclude_unset=True)
+            # pydantic drops unknown keys; keep them, so that the write
+            # rejects them instead of ignoring e.g. fields outside "fields"
+            if isinstance(value, dict):
+                data |= {
+                    key: item
+                    for key, item in value.items()
+                    if key not in validator.model_fields
+                }
+            return data
+
+        return core_schema.no_info_wrap_validator_function(
+            validate,
             validator.__pydantic_core_schema__,
             ref=name,
             metadata=metadata,
