@@ -23,9 +23,6 @@ from feincms3_api.writing import WritingMixin
 
 _instances = []
 
-# Names of the API's own routes, which resources can't take
-RESERVED = {"schema", "uploads", "batch", "tokens"}
-
 
 class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin, BatchMixin):
     def __init__(self, *, auth=None, codecs=None, adapters=None):
@@ -40,7 +37,7 @@ class ContentAPI(ReadingMixin, SchemaMixin, WritingMixin, BatchMixin):
     def register(self, resource):
         if "router" in self.__dict__:
             raise RuntimeError("Register resources before using the router.")
-        if resource.name in self._resources or resource.name in RESERVED:
+        if resource.name in self._resources:
             raise ValueError(f"The resource name {resource.name!r} is taken.")
         self._resources[resource.name] = resource
         return resource

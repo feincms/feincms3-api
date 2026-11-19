@@ -237,7 +237,7 @@ class Pages(PageResource):
         return {**super().describe(request, obj), "page_type": obj.page_type}
 
     def cache_keys(self, request, obj):
-        """What ``DELETE /pages/{id}/cache/`` deletes"""
+        """What ``DELETE /resources/pages/{id}/cache/`` deletes"""
         return [*super().cache_keys(request, obj), f"navigation-{obj.language_code}"]
 
 
@@ -314,9 +314,7 @@ open an issue, it may point to something the API should handle itself.
   writing, and expire after `TOKEN_LIFETIME` (8 hours by default). Users
   list and revoke their own tokens over the API (`GET /tokens/`, `DELETE
   /tokens/{id}/`, `DELETE /tokens/current/`; `f3api tokens`, `f3api
-  logout`). The routes come with the API; no resource can be called
-  `tokens`. For
-  scripts and agents, create a staff user with only the permissions they
+  logout`). The routes come with the API. For scripts and agents, create a staff user with only the permissions they
   need rather than using a superuser's token.
 - **Cleanup**: run `./manage.py f3api_cleanup` daily; it removes expired
   tokens and uploads. Set it up wherever the servers' scheduled jobs live

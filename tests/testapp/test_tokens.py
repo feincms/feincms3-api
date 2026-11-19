@@ -31,29 +31,30 @@ class TokenTest(TestCase):
         self.assertTrue(secret.startswith(token.prefix))
         self.assertNotIn(secret, {token.hash, token.prefix})
 
-        response = self.get(f"pages/{self.page.pk}/", secret)
+        response = self.get(f"resources/pages/{self.page.pk}/", secret)
         self.assertEqual(response.status_code, 200)
         token.refresh_from_db()
         self.assertIsNotNone(token.last_used_at)
 
-        self.assertEqual(self.get("pages/", "f3api_wrong").status_code, 401)
-        self.assertEqual(self.get("pages/", "wrong").status_code, 401)
+        self.assertEqual(self.get("resources/pages/", "f3api_wrong").status_code, 401)
+        self.assertEqual(self.get("resources/pages/", "wrong").status_code, 401)
 
     def test_permissions_are_the_users(self):
         _token, secret = APIToken.objects.create_token(user=self.staff, name="x")
         # A staff user without permissions sees nothing
-        self.assertEqual(self.get("pages/", secret).status_code, 403)
+        self.assertEqual(self.get("resources/pages/", secret).status_code, 403)
 
     def test_invalid_tokens(self):
         token, secret = APIToken.objects.create_token(user=self.staff, name="x")
 
         token.expires_at = timezone.now() - timedelta(seconds=1)
         token.save()
-        self.assertEqual(self.get("pages/", secret).status_code, 401)
+        self.assertEqual(self.get("resources/pages/", secret).status_code, 401)
 
         # Not a CSRF failure of the session auth tried next
         response = Client(enforce_csrf_checks=True).delete(
-            f"/api/pages/{self.page.pk}/", headers={"authorization": f"Bearer {secret}"}
+            f"/api/resources/pages/{self.page.pk}/",
+            headers={"authorization": f"Bearer {secret}"},
         )
         self.assertEqual(response.status_code, 401)
 
@@ -61,12 +62,12 @@ class TokenTest(TestCase):
         token.save()
         self.staff.is_staff = False
         self.staff.save()
-        self.assertEqual(self.get("pages/", secret).status_code, 401)
+        self.assertEqual(self.get("resources/pages/", secret).status_code, 401)
 
         self.staff.is_staff = True
         self.staff.is_active = False
         self.staff.save()
-        self.assertEqual(self.get("pages/", secret).status_code, 401)
+        self.assertEqual(self.get("resources/pages/", secret).status_code, 401)
 
     def test_read_only(self):
         _token, secret = APIToken.objects.create_token(user=self.staff, name="x")
@@ -183,7 +184,7 @@ class OwnTokensTest(TestCase):
         self.assertTrue(response.json()["current"])
 
     def test_read_only_still_reads_only(self):
-        response = self.request("delete", "pages/1/", self.read_secret)
+        response = self.request("delete", "resources/pages/1/", self.read_secret)
         self.assertEqual(response.status_code, 403)
 
     def test_session(self):
@@ -199,12 +200,15 @@ class OwnTokensTest(TestCase):
         response = self.client.delete(f"/api/tokens/{self.read.pk}/")
         self.assertEqual(response.status_code, 200)
 
-    def test_reserved(self):
+    def test_resource_names(self):
         from feincms3_api.api import ContentAPI  # noqa: PLC0415
         from feincms3_api.resources import ObjectResource  # noqa: PLC0415
 
+        # The API's own routes don't take names from resources
+        api = ContentAPI()
+        api.register(ObjectResource(Page, name="tokens"))
         with self.assertRaises(ValueError):
-            ContentAPI().register(ObjectResource(Page, name="tokens"))
+            api.register(ObjectResource(Page, name="tokens"))
 
 
 def grant(user, *actions):

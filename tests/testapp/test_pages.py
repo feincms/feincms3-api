@@ -4,7 +4,7 @@ from testapp.test_write import WriteTestCase
 
 class PagesTest(WriteTestCase):
     def find(self, resource="pages", **params):
-        return self.client.get(f"/api/{resource}/find/", params)
+        return self.client.get(f"/api/resources/{resource}/find/", params)
 
     def test_find(self):
         response = self.find(path="/de/angebot/")
@@ -32,7 +32,7 @@ class PagesTest(WriteTestCase):
             language_code="de",
             page_type="standard",
         )
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "patch",
             path,
@@ -64,13 +64,13 @@ class PagesTest(WriteTestCase):
             page_type="standard",
             translation_of=self.angebot,
         )
-        data = self.get("pages/", translation_of=self.angebot.pk).json()
+        data = self.get("resources/pages/", translation_of=self.angebot.pk).json()
         self.assertEqual([item["id"] for item in data["items"]], [self.fr_angebot.pk])
 
     def test_path_clash(self):
         response = self.send(
             "post",
-            "pages/",
+            "resources/pages/",
             {
                 "fields": {
                     "title": "Angebot",

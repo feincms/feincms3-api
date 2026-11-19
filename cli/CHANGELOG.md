@@ -2,6 +2,7 @@
 
 ## Next version
 
+- Needs feincms3-api with the resources below `resources/`.
 - `f3api site` is now `f3api sites`, like `tokens` (`site` still works).
   The help and the README say which manages the sites on this machine and
   which the tokens on the server.

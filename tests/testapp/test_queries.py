@@ -23,19 +23,21 @@ class QueryCountTest(WriteTestCase):
     def test_detail(self):
         # The page, its plugins per inline, the hidden plugins in one query
         with self.assertNumQueries(REQUEST + 1 + PLUGIN_INLINES + 1):
-            self.get(f"pages/{self.angebot.pk}/")
+            self.get(f"resources/pages/{self.angebot.pk}/")
 
     def test_list(self):
         # The pages and their count
         with self.assertNumQueries(REQUEST + 2):
-            self.get("pages/")
+            self.get("resources/pages/")
 
     def test_list_with_content(self):
         # The plugins are fetched once per inline for all pages, only the
         # hidden plugins are counted per page.
         one, three = (
             self.count(
-                lambda limit=limit: self.get(f"pages/?content=true&limit={limit}")
+                lambda limit=limit: self.get(
+                    f"resources/pages/?content=true&limit={limit}"
+                )
             )
             for limit in (1, 3)
         )
@@ -45,7 +47,7 @@ class QueryCountTest(WriteTestCase):
     def test_writes(self):
         # Pinned, to notice changes; most are the admin's formsets and the
         # tree's saves.
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         etag = self.etag(path)
         self.assertEqual(
             self.count(

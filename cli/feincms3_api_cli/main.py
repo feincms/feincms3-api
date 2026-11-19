@@ -342,7 +342,7 @@ def list_objects(resource, filters, q, limit, offset, fields, content, expand, a
         "content": "true" if content else None,
         "expand": "references" if expand else None,
     }
-    _status, data = client.request("GET", f"{resource}/", params=params)
+    _status, data = client.request("GET", f"resources/{resource}/", params=params)
     # Without content, an item's ETag isn't the object's.
     if content:
         etags.update({(resource, item["id"]): _etag(item) for item in data["items"]})
@@ -386,7 +386,7 @@ def get(resource, id, nested, expand):
     client, etags = connect()
     _status, data = client.request(
         "GET",
-        f"{resource}/{id}/",
+        f"resources/{resource}/{id}/",
         params={
             "nested": "true" if nested else None,
             "expand": "references" if expand else None,
@@ -404,7 +404,7 @@ def find(path, resource, host):
     """An object by its path."""
     client, etags = connect()
     _status, data = client.request(
-        "GET", f"{resource}/find/", params={"path": path, "host": host}
+        "GET", f"resources/{resource}/find/", params={"path": path, "host": host}
     )
     etags.update({(resource, data["id"]): _etag(data)})
     output(data)
@@ -418,7 +418,11 @@ def find(path, resource, host):
 def plugin(resource, id, type, plugin_id):
     """One plugin of an object."""
     client, _etags = connect()
-    output(client.request("GET", f"{resource}/{id}/plugins/{type}/{plugin_id}/")[1])
+    output(
+        client.request("GET", f"resources/{resource}/{id}/plugins/{type}/{plugin_id}/")[
+            1
+        ]
+    )
 
 
 # Writing ####################################################################
@@ -476,7 +480,7 @@ def create(resource, file, apply):
     """Create an object from JSON."""
     client, etags = connect()
     _status, data = client.request(
-        "POST", f"{resource}/", params=_params(apply), body=read_json(file)
+        "POST", f"resources/{resource}/", params=_params(apply), body=read_json(file)
     )
     if apply:
         etags.update({(resource, data["id"]): _etag(data)})
@@ -493,7 +497,7 @@ def update(resource, id, file, apply, etag, force):
     client, etags = connect()
     _status, data = client.request(
         "PATCH",
-        f"{resource}/{id}/",
+        f"resources/{resource}/{id}/",
         params=_params(apply),
         body=read_json(file),
         headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
@@ -517,7 +521,7 @@ def content(resource, id, file, apply, etag, force):
         body = {"content": body}
     _status, data = client.request(
         "PUT",
-        f"{resource}/{id}/content/",
+        f"resources/{resource}/{id}/content/",
         params=_params(apply),
         body=body,
         headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
@@ -542,7 +546,7 @@ def update_plugin(resource, id, type, plugin_id, file, apply, etag, force):
         body = {"fields": body}
     _status, data = client.request(
         "PATCH",
-        f"{resource}/{id}/plugins/{type}/{plugin_id}/",
+        f"resources/{resource}/{id}/plugins/{type}/{plugin_id}/",
         params=_params(apply),
         body=body,
         headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
@@ -561,7 +565,7 @@ def delete(resource, id, apply, etag, force):
     client, etags = connect()
     client.request(
         "DELETE",
-        f"{resource}/{id}/",
+        f"resources/{resource}/{id}/",
         params=_params(apply),
         headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
     )
@@ -581,7 +585,7 @@ def delete(resource, id, apply, etag, force):
 def cache_clear(resource, id):
     """Delete an object's cached rendering."""
     client, _etags = connect()
-    client.request("DELETE", f"{resource}/{id}/cache/")
+    client.request("DELETE", f"resources/{resource}/{id}/cache/")
 
 
 @cli.command()

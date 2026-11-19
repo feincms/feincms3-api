@@ -27,7 +27,7 @@ class CreateTest(WriteTestCase):
     def test_create_page_with_content(self):
         response = self.send(
             "post",
-            "pages/",
+            "resources/pages/",
             {
                 "fields": {
                     "title": "Kontakt",
@@ -75,7 +75,7 @@ class CreateTest(WriteTestCase):
     def test_create_dry_run(self):
         response = self.send(
             "post",
-            "articles/",
+            "resources/articles/",
             {
                 "fields": {"title": "News", "slug": "news", "language_code": "de"},
                 "content": {
@@ -96,7 +96,7 @@ class CreateTest(WriteTestCase):
     def test_create_errors(self):
         response = self.send(
             "post",
-            "pages/",
+            "resources/pages/",
             {
                 "fields": {
                     "slug": "x",
@@ -146,7 +146,7 @@ class CreateTest(WriteTestCase):
             "page_type": "standard",
             "language_code": "de",
         }
-        response = self.send("post", "pages/", {"fields": fields})
+        response = self.send("post", "resources/pages/", {"fields": fields})
         self.assertEqual(response.status_code, 422)
         self.assertEqual(
             [error["path"] for error in response.json()["errors"]],
@@ -155,10 +155,12 @@ class CreateTest(WriteTestCase):
         schema = self.get("schema/testapp.page/").json()
         self.assertIn("is_active", schema["required"])
 
-        response = self.send("post", "pages/", {"fields": fields | {"is_active": True}})
+        response = self.send(
+            "post", "resources/pages/", {"fields": fields | {"is_active": True}}
+        )
         self.assertEqual(response.status_code, 201, response.content)
         # Updates don't need it
-        path = f"pages/{response.json()['id']}/"
+        path = f"resources/pages/{response.json()['id']}/"
         response = self.send(
             "patch", path, {"fields": {"title": "Kontakte"}}, etag=self.etag(path)
         )
@@ -172,13 +174,13 @@ class CreateTest(WriteTestCase):
             )
         )
         self.client.force_login(user)
-        response = self.send("post", "pages/", {"fields": {"title": "x"}})
+        response = self.send("post", "resources/pages/", {"fields": {"title": "x"}})
         self.assertEqual(response.status_code, 403)
 
 
 class UpdateTest(WriteTestCase):
     def test_etag_required(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send("patch", path, {"fields": {"title": "Neu"}})
         self.assertEqual(response.status_code, 428)
 
@@ -190,7 +192,7 @@ class UpdateTest(WriteTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_update_fields(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         etag = self.etag(path)
         response = self.send(
             "patch",
@@ -214,7 +216,7 @@ class UpdateTest(WriteTestCase):
 
     def test_round_trip(self):
         """What was read can be written back, read-only fields included"""
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.get(path)
         data = response.json()
         response = self.send(
@@ -228,7 +230,7 @@ class UpdateTest(WriteTestCase):
         self.assertEqual(response["ETag"], data["meta"]["etag"])
 
     def test_replace_content(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         etag = self.etag(path)
         response = self.send(
             "put",
@@ -275,7 +277,7 @@ class UpdateTest(WriteTestCase):
         self.assertTrue(message.endswith("(Through the API.)"))
 
     def test_replace_content_dry_run(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "put",
             f"{path}content/",
@@ -293,7 +295,7 @@ class UpdateTest(WriteTestCase):
         self.assertEqual(RichText.objects.filter(parent=self.angebot).count(), 2)
 
     def test_excluded_json_values_are_kept(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "put",
             f"{path}content/",
@@ -324,7 +326,7 @@ class UpdateTest(WriteTestCase):
 
     def test_plugin_of_another_object(self):
         other = RichText.objects.create(parent=self.home, region="main", text="x")
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "put",
             f"{path}content/",
@@ -335,7 +337,7 @@ class UpdateTest(WriteTestCase):
         self.assertEqual(response.json()["errors"][0]["path"], "content.main[0].id")
 
     def test_invalid_page_type(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "patch",
             path,
@@ -348,7 +350,7 @@ class UpdateTest(WriteTestCase):
 
 class PluginTest(WriteTestCase):
     def test_update_plugin(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         etag = self.etag(path)
         response = self.send(
             "patch",
@@ -376,7 +378,7 @@ class PluginTest(WriteTestCase):
         self.assertEqual(response.json()["errors"][0]["path"], "fields.button_label")
 
     def test_json_schema_validation(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send(
             "patch",
             f"{path}plugins/testapp.jsonplugin_key_figures/{self.figures.pk}/",
@@ -389,7 +391,7 @@ class PluginTest(WriteTestCase):
 
 class DeleteTest(WriteTestCase):
     def test_delete(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         response = self.send("delete", path, etag=self.etag(path), dry_run="true")
         self.assertEqual(response.status_code, 204)
         self.assertTrue(Page.objects.filter(pk=self.angebot.pk).exists())
@@ -400,7 +402,7 @@ class DeleteTest(WriteTestCase):
         self.assertTrue(LogEntry.objects.get().is_deletion())
 
     def test_page_with_children(self):
-        path = f"pages/{self.home.pk}/"
+        path = f"resources/pages/{self.home.pk}/"
         response = self.send("delete", path, etag=self.etag(path))
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["children"][0]["id"], self.angebot.pk)
@@ -408,7 +410,7 @@ class DeleteTest(WriteTestCase):
     def test_protected(self):
         person = Person.objects.create(name="Anna")
         Contact.objects.create(parent=self.angebot, region="main", person=person)
-        path = f"persons/{person.pk}/"
+        path = f"resources/persons/{person.pk}/"
         response = self.send("delete", path, etag=self.etag(path))
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["protected"][0]["type"], "testapp.contact")
@@ -419,7 +421,7 @@ class CacheTest(WriteTestCase):
     def test_clear_cache(self):
         key = f"regions-testapp.page-{self.angebot.pk}"
         cache.set(key, "rendered")
-        response = self.send("delete", f"pages/{self.angebot.pk}/cache/")
+        response = self.send("delete", f"resources/pages/{self.angebot.pk}/cache/")
         self.assertEqual(response.status_code, 204)
         self.assertIsNone(cache.get(key))
 
@@ -431,6 +433,6 @@ class CacheTest(WriteTestCase):
             )
         )
         self.client.force_login(user)
-        response = self.send("delete", f"pages/{self.angebot.pk}/cache/")
+        response = self.send("delete", f"resources/pages/{self.angebot.pk}/cache/")
         self.assertEqual(response.status_code, 403)
         self.assertEqual(cache.get(key), "rendered")

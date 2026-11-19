@@ -2,6 +2,10 @@
 
 ## Next version
 
+- **Backwards incompatible:** the resources are below `resources/`
+  (`/api/resources/pages/17/`), so that a resource can take any name,
+  also `schema`, `uploads`, `batch` or `tokens` (#22). A path starting with
+  a resource's name answers where it is now.
 - The CLI's change log has a title of its own in the docs' navigation.
 
 ## 0.4 (2026-11-19)

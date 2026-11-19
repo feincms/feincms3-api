@@ -162,7 +162,7 @@ region) need nothing special: their regions are regions.
 
 ## The wire format
 
-One object, as `GET /content/pages/17/` returns it:
+One object, as `GET /resources/pages/17/` returns it:
 
 ```json
 {
@@ -365,22 +365,26 @@ gets every field read-only, as the admin shows it.
 
 Under the project's mount point, `{resource}` being the resource's name
 (`pages`, `articles`, …, default: the model name with an `s`, or `name=`;
-not the verbose name, which changes with the language):
+not the verbose name, which changes with the language). The resources are
+below `resources/`, a namespace of their own: the first segment of a path
+is always the API's, so a resource can take any name (`tokens`, `schema`)
+and new routes of the API never collide with a project's resources. A
+path which starts with a resource's name answers where the resource is.
 
 | | |
 |---|---|
 | `GET /schema/` | resources (with their `filters` and whether `q` works, `search`), their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
-| `GET /{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`; a `400` if it has none, rather than everything), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
-| `POST /{resource}/` | create, with or without `content` |
-| `GET /{resource}/{id}/` | one object with its content |
-| `PATCH /{resource}/{id}/` | change fields; `content` if given, see below |
-| `PUT /{resource}/{id}/content/` | replace the content of the regions given |
-| `GET /{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
-| `PATCH /{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
-| `DELETE /{resource}/{id}/` | delete |
-| `DELETE /{resource}/{id}/cache/` | delete the cached rendering, see below |
-| `GET /pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
+| `GET /resources/{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`; a `400` if it has none, rather than everything), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
+| `POST /resources/{resource}/` | create, with or without `content` |
+| `GET /resources/{resource}/{id}/` | one object with its content |
+| `PATCH /resources/{resource}/{id}/` | change fields; `content` if given, see below |
+| `PUT /resources/{resource}/{id}/content/` | replace the content of the regions given |
+| `GET /resources/{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
+| `PATCH /resources/{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
+| `DELETE /resources/{resource}/{id}/` | delete |
+| `DELETE /resources/{resource}/{id}/cache/` | delete the cached rendering, see below |
+| `GET /resources/pages/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
 | `POST /uploads/` | upload a file (multipart), returns an upload id, see "Files" |
 | `POST /batch/` | several writes in one transaction, see "Batches" |
 | `GET /tokens/`, `DELETE /tokens/{id}/`, `DELETE /tokens/current/` | the user's tokens, revoking one, see "Authentication and permissions" |
@@ -412,7 +416,7 @@ person) isn't the API's.
 
 ## Writing content
 
-`PUT /{resource}/{id}/content/` with `{"content": {"main": […]}}`:
+`PUT /resources/{resource}/{id}/content/` with `{"content": {"main": […]}}`:
 
 - **Regions given are replaced, others are left alone.** An agent rewriting
   `main` doesn't have to round-trip the sidebar.
@@ -621,11 +625,11 @@ Nothing cabinet-specific is needed for files: they go through cabinet's
 file admin like any resource, and their `image_file` and `download_file`
 fields take uploads. Cabinet's own validation (exactly one file) applies.
 
-- `POST /files/` with `{"fields": {"folder": …, "image_file": {"upload":
+- `POST /resources/files/` with `{"fields": {"folder": …, "image_file": {"upload":
   "<id>"}, "image_alt_text": …}}`; `?folder=` filters the list.
-- `PATCH /files/{id}/` changes metadata; a new `upload` replaces the file
+- `PATCH /resources/files/{id}/` changes metadata; a new `upload` replaces the file
   under the same id where the model has cabinet's `OverwriteMixin`.
-- `DELETE /files/{id}/` of a file still in use returns `409` with the
+- `DELETE /resources/files/{id}/` of a file still in use returns `409` with the
   referencing objects (cabinet foreign keys are `PROTECT`).
 - Listing unused files is left to cabinet: going by foreign keys, the API
   can't tell an unused file from one whose URL is used elsewhere (in rich
@@ -689,8 +693,7 @@ are [#5](https://github.com/feincms/feincms3-api/issues/5).
   admin shows them anyway, so any of their tokens (and their session) sees
   and revokes the others, e.g. one which leaked. Read-only tokens may
   revoke themselves, but no others: revoking isn't reading, yet an agent
-  with a read-only token should be able to log out. `schema`, `uploads`,
-  `batch` and `tokens` can't be resource names.
+  with a read-only token should be able to log out.
 - Only staff users (`is_staff`) can use the API at all, since every
   permission check goes through the admin.
 - Who changed what: `LogEntry` rows as the admin writes them

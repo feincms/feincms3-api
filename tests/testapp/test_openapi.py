@@ -32,20 +32,21 @@ class OpenAPITest(WriteTestCase):
                 content = operation["responses"][status]["content"]
             return content["application/json"]["schema"]["$ref"]
 
-        detail = paths["/api/pages/{pk}/"]
+        detail = paths["/api/resources/pages/{pk}/"]
         self.assertEqual(schema(detail["get"], "200"), f"{SCHEMAS}TestappPage")
         self.assertEqual(schema(detail["get"], "404"), f"{SCHEMAS}Error")
         self.assertEqual(schema(detail["patch"]), f"{SCHEMAS}TestappPageWrite")
         self.assertEqual(schema(detail["patch"], "412"), f"{SCHEMAS}Error")
         self.assertEqual(
-            schema(paths["/api/pages/"]["get"], "200"), f"{SCHEMAS}TestappPageList"
+            schema(paths["/api/resources/pages/"]["get"], "200"),
+            f"{SCHEMAS}TestappPageList",
         )
         self.assertEqual(
-            schema(paths["/api/pages/{pk}/content/"]["put"]),
+            schema(paths["/api/resources/pages/{pk}/content/"]["put"]),
             f"{SCHEMAS}TestappPageContentWrite",
         )
         self.assertEqual(schema(paths["/api/batch/"]["post"]), f"{SCHEMAS}Batch")
-        plugin = paths["/api/pages/{pk}/plugins/{type_label}/{plugin_id}/"]
+        plugin = paths["/api/resources/pages/{pk}/plugins/{type_label}/{plugin_id}/"]
         self.assertEqual(schema(plugin["patch"]), f"{SCHEMAS}PluginWrite")
         self.assertEqual(schema(plugin["patch"], "200"), f"{SCHEMAS}TestappPagePlugin")
 
@@ -127,10 +128,15 @@ class OpenAPITest(WriteTestCase):
 
     def test_validation(self):
         # The bodies are validated as before, the rest is the operations'
-        self.assertEqual(self.send("post", "pages/", [1]).status_code, 422)
-        self.assertEqual(self.send("post", "pages/", {"fields": "x"}).status_code, 422)
+        self.assertEqual(self.send("post", "resources/pages/", [1]).status_code, 422)
+        self.assertEqual(
+            self.send("post", "resources/pages/", {"fields": "x"}).status_code, 422
+        )
         response = self.send(
-            "post", "pages/", {"fields": {"title": "X"}, "unknown": 1}, dry_run="true"
+            "post",
+            "resources/pages/",
+            {"fields": {"title": "X"}, "unknown": 1},
+            dry_run="true",
         )
         self.assertEqual(response.status_code, 422)
         self.assertIn("errors", response.json())

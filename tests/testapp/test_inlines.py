@@ -22,7 +22,7 @@ class InlinesTest(WriteTestCase):
         )
         self.morning = Session.objects.create(training=self.training, title="Morgen")
         self.evening = Session.objects.create(training=self.training, title="Abend")
-        self.path = f"trainings/{self.training.pk}/"
+        self.path = f"resources/trainings/{self.training.pk}/"
 
     def test_read(self):
         data = self.get(self.path).json()
@@ -100,7 +100,7 @@ class InlinesTest(WriteTestCase):
         with self.settings(FEINCMS3_API={}):
             response = self.send(
                 "post",
-                "trainings/",
+                "resources/trainings/",
                 {
                     "fields": {"title": "Neu", "slug": "neu", "language_code": "de"},
                     "inlines": {
@@ -207,7 +207,7 @@ class InlinesTest(WriteTestCase):
 class HooksTest(WriteTestCase):
     def test_save_related(self):
         article = Article.objects.create(title="News", slug="news", language_code="de")
-        path = f"articles/{article.pk}/"
+        path = f"resources/articles/{article.pk}/"
         writes = [
             ("patch", path, {"fields": {"title": "Neu"}}),
             (

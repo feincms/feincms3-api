@@ -101,7 +101,7 @@ class BatchTest(WriteTestCase):
         self.assertEqual(Page.objects.count(), count)
 
     def test_etags(self):
-        path = f"pages/{self.angebot.pk}/"
+        path = f"resources/pages/{self.angebot.pk}/"
         operation = {
             "op": "update",
             "resource": "pages",
@@ -142,7 +142,7 @@ class BatchTest(WriteTestCase):
         self.assertEqual(response.status_code, 412)
 
     def test_plugin_and_delete(self):
-        etag = self.etag(f"pages/{self.angebot.pk}/")
+        etag = self.etag(f"resources/pages/{self.angebot.pk}/")
         response = self.batch(
             [
                 {
@@ -157,7 +157,7 @@ class BatchTest(WriteTestCase):
                     "op": "delete",
                     "resource": "pages",
                     "id": self.fr.pk,
-                    "etag": self.etag(f"pages/{self.fr.pk}/"),
+                    "etag": self.etag(f"resources/pages/{self.fr.pk}/"),
                 },
             ]
         )

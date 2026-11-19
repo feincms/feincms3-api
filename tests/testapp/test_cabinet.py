@@ -22,7 +22,9 @@ class CabinetTest(WriteTestCase):
         return response.json()["upload"]
 
     def test_folders_and_files(self):
-        response = self.send("post", "folders/", {"fields": {"name": "Bilder"}})
+        response = self.send(
+            "post", "resources/folders/", {"fields": {"name": "Bilder"}}
+        )
         self.assertEqual(response.status_code, 201, response.content)
         folder = response.json()["id"]
         self.assertTrue(
@@ -32,7 +34,7 @@ class CabinetTest(WriteTestCase):
         with self.captureOnCommitCallbacks(execute=True):
             response = self.send(
                 "post",
-                "files/",
+                "resources/files/",
                 {
                     "fields": {
                         "folder": {"type": "cabinet.folder", "id": folder},
@@ -49,18 +51,18 @@ class CabinetTest(WriteTestCase):
             response.json()["fields"]["image_file"]["name"], file.image_file.name
         )
 
-        data = self.get("files/", folder=folder).json()
+        data = self.get("resources/files/", folder=folder).json()
         self.assertEqual([item["id"] for item in data["items"]], [file.pk])
 
         # Not empty, so not deleted
-        path = f"folders/{folder}/"
+        path = f"resources/folders/{folder}/"
         response = self.send("delete", path, etag=self.etag(path))
         self.assertEqual(response.status_code, 409)
 
     def test_exactly_one_file(self):
         response = self.send(
             "post",
-            "files/",
+            "resources/files/",
             {
                 "fields": {
                     "image_file": {"upload": self.upload("blau.png", png())},
@@ -79,6 +81,6 @@ class CabinetTest(WriteTestCase):
         user.user_permissions.add(Permission.objects.get(codename="view_folder"))
         self.client.force_login(user)
         Folder.objects.create(name="Dokumente")
-        self.assertEqual(self.get("folders/").json()["count"], 1)
-        response = self.send("post", "folders/", {"fields": {"name": "x"}})
+        self.assertEqual(self.get("resources/folders/").json()["count"], 1)
+        response = self.send("post", "resources/folders/", {"fields": {"name": "x"}})
         self.assertEqual(response.status_code, 403)

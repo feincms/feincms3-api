@@ -2,12 +2,12 @@
 
 import datetime as dt
 import functools
+import re
 from typing import Any, Literal
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from ninja import Body, Field, File, Router, Schema, UploadedFile
 
-from feincms3_api.api import RESERVED
 from feincms3_api.auth import allowing_read_only
 from feincms3_api.errors import APIError, NotFoundError
 from feincms3_api.openapi import component_name
@@ -118,10 +118,15 @@ def build_router(api):
             for resource in api.resources
             if resource.has_view_permission(request)
         ]
-        name = rest.split("/", maxsplit=1)[0]
-        if name not in [*names, *RESERVED]:
+        namespace, _slash, rest_of_path = rest.partition("/")
+        name = rest_of_path.split("/", maxsplit=1)[0]
+        if namespace == "resources" and name not in names:
             raise NotFoundError(
                 f"No resource {name!r}. The resources: {', '.join(names)}."
+            )
+        if namespace in names:
+            raise NotFoundError(
+                f"Nothing at {rest!r}; the resource is at 'resources/{namespace}/'."
             )
         if not rest.endswith("/"):
             raise NotFoundError(f"Nothing at {rest!r}; the paths end in a slash.")
@@ -132,7 +137,10 @@ def build_router(api):
 
 def _add_routes(api, router, resource, components):
     name = resource.name
-    operation = name.replace("-", "_")
+    # The resources have a namespace of their own, so that their names
+    # can't collide with the API's own routes
+    prefix = f"resources/{name}"
+    operation = re.sub(r"[^A-Za-z0-9_]", "_", name)
     component = component_name(resource.type)
     read_type = components.annotation(component)
     list_type = components.annotation(f"{component}List")
@@ -150,7 +158,7 @@ def _add_routes(api, router, resource, components):
     if resource.findable:
         # Before {pk}/, which would take "find" for an id
         @router.get(
-            f"{name}/find/",
+            f"{prefix}/find/",
             operation_id=f"{operation}_find",
             response=responses({200: read_type}, 409),
         )
@@ -160,7 +168,7 @@ def _add_routes(api, router, resource, components):
             return _json(api.find(request, name, request.GET))
 
     @router.get(
-        f"{name}/",
+        f"{prefix}/",
         operation_id=f"{operation}_list",
         response=responses({200: list_type}, 400),
     )
@@ -170,7 +178,7 @@ def _add_routes(api, router, resource, components):
         return api.list(request, name, request.GET)
 
     @router.get(
-        f"{name}/{{pk}}/",
+        f"{prefix}/{{pk}}/",
         operation_id=f"{operation}_detail",
         response=responses({200: read_type}),
     )
@@ -188,7 +196,7 @@ def _add_routes(api, router, resource, components):
         return wire
 
     @router.get(
-        f"{name}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
+        f"{prefix}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
         operation_id=f"{operation}_plugin",
         response=responses({200: plugin_type}),
     )
@@ -205,7 +213,7 @@ def _add_routes(api, router, resource, components):
         )
 
     @router.post(
-        f"{name}/",
+        f"{prefix}/",
         operation_id=f"{operation}_create",
         response=responses({200: read_type, 201: read_type}, 422),
     )
@@ -216,7 +224,7 @@ def _add_routes(api, router, resource, components):
         return _json(wire, 200 if dry_run else 201)
 
     @router.patch(
-        f"{name}/{{pk}}/",
+        f"{prefix}/{{pk}}/",
         operation_id=f"{operation}_update",
         response=responses({200: read_type}, *writes),
     )
@@ -234,7 +242,7 @@ def _add_routes(api, router, resource, components):
         return _json(wire)
 
     @router.put(
-        f"{name}/{{pk}}/content/",
+        f"{prefix}/{{pk}}/content/",
         operation_id=f"{operation}_content",
         response=responses({200: read_type}, *writes),
     )
@@ -254,7 +262,7 @@ def _add_routes(api, router, resource, components):
         return _json(wire)
 
     @router.patch(
-        f"{name}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
+        f"{prefix}/{{pk}}/plugins/{{type_label}}/{{plugin_id}}/",
         operation_id=f"{operation}_plugin_update",
         response=responses({200: plugin_type}, *writes),
     )
@@ -281,7 +289,7 @@ def _add_routes(api, router, resource, components):
         return _json(wire)
 
     @router.delete(
-        f"{name}/{{pk}}/",
+        f"{prefix}/{{pk}}/",
         operation_id=f"{operation}_delete",
         response=responses({204: None}, *writes),
     )
@@ -298,7 +306,7 @@ def _add_routes(api, router, resource, components):
         return HttpResponse(status=204)
 
     @router.delete(
-        f"{name}/{{pk}}/cache/",
+        f"{prefix}/{{pk}}/cache/",
         operation_id=f"{operation}_cache_clear",
         response=responses({204: None}),
     )

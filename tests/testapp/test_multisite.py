@@ -35,14 +35,18 @@ class SitesTest(MultisiteTestCase):
         )
 
     def test_find(self):
-        response = self.get("site-pages/find/", path="/home/")
+        response = self.get("resources/site-pages/find/", path="/home/")
         self.assertEqual(response.status_code, 409)
         self.assertEqual(len(response.json()["pages"]), 2)
 
-        response = self.get("site-pages/find/", path="/home/", host="example.org")
+        response = self.get(
+            "resources/site-pages/find/", path="/home/", host="example.org"
+        )
         self.assertEqual(response.json()["id"], self.home_org.pk)
         # The default site serves unknown hosts, as feincms3-sites does
-        response = self.get("site-pages/find/", path="/home/", host="example.net")
+        response = self.get(
+            "resources/site-pages/find/", path="/home/", host="example.net"
+        )
         self.assertEqual(response.json()["id"], self.home_com.pk)
 
     def test_create(self):
@@ -51,7 +55,7 @@ class SitesTest(MultisiteTestCase):
             title="Kontakt", slug="kontakt", parent=self.home_com, page_type="standard"
         )
         response = self.post(
-            "site-pages/",
+            "resources/site-pages/",
             {
                 "fields": {
                     "title": "Kontakt",
@@ -71,7 +75,7 @@ class SitesTest(MultisiteTestCase):
 
         # A second one on the same site clashes
         response = self.post(
-            "site-pages/",
+            "resources/site-pages/",
             {
                 "fields": {
                     "title": "Kontakt",
@@ -87,7 +91,7 @@ class SitesTest(MultisiteTestCase):
 
     def test_root_needs_a_site(self):
         response = self.post(
-            "site-pages/",
+            "resources/site-pages/",
             {
                 "fields": {
                     "title": "Start",
@@ -99,7 +103,7 @@ class SitesTest(MultisiteTestCase):
         )
         self.assertEqual(response.status_code, 422)
         response = self.post(
-            "site-pages/",
+            "resources/site-pages/",
             {
                 "fields": {
                     "title": "Start",
@@ -137,10 +141,12 @@ class LanguageSitesTest(MultisiteTestCase):
         )
 
     def test_find(self):
-        response = self.get("language-pages/find/", path="/")
+        response = self.get("resources/language-pages/find/", path="/")
         self.assertEqual(response.status_code, 409)
 
-        response = self.get("language-pages/find/", path="/", host="example.fr")
+        response = self.get(
+            "resources/language-pages/find/", path="/", host="example.fr"
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["id"], self.fr.pk)
@@ -148,12 +154,14 @@ class LanguageSitesTest(MultisiteTestCase):
             data["meta"]["url"].endswith("//example.fr/"), data["meta"]["url"]
         )
 
-        response = self.get("language-pages/find/", path="/", host="example.ch")
+        response = self.get(
+            "resources/language-pages/find/", path="/", host="example.ch"
+        )
         self.assertEqual(response.status_code, 404)
 
     def test_create(self):
         response = self.post(
-            "language-pages/",
+            "resources/language-pages/",
             {
                 "fields": {
                     "title": "Offre",
@@ -169,5 +177,5 @@ class LanguageSitesTest(MultisiteTestCase):
         self.assertEqual(response.json()["meta"]["path"], "/offre/")
         self.assertTrue(response.json()["meta"]["url"].endswith("//example.fr/offre/"))
 
-        data = self.get("language-pages/", translation_of=self.de.pk).json()
+        data = self.get("resources/language-pages/", translation_of=self.de.pk).json()
         self.assertEqual([item["id"] for item in data["items"]], [self.fr.pk])
