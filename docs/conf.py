@@ -41,7 +41,9 @@ PAGES = {
     **{f"docs/{p.name}": p.name for p in DOCS.glob("*.md")},
 }
 LINK = re.compile(
-    r"\]\((?P<target>(?:" + re.escape(GITHUB) + r"blob/main/)?[^)#\s:]*)(?P<anchor>#[^)\s]*)?\)"
+    r"\]\((?P<target>(?:"
+    + re.escape(GITHUB)
+    + r"blob/main/)?[^)#\s:]*)(?P<anchor>#[^)\s]*)?\)"
 )
 
 
