@@ -9,7 +9,6 @@ they fail instead of overwriting someone else's change. Errors are printed
 with their paths.
 """
 
-import copy
 import getpass
 import json
 import os
@@ -99,8 +98,8 @@ def read_json(path):
         ) from exc
 
 
-def connect():
-    site = click.get_current_context().find_root().params.get("site")
+def connect(site=None):
+    site = site or click.get_current_context().find_root().params.get("site")
     try:
         url, token = Sites().resolve(site)
     except LookupError as exc:
@@ -129,18 +128,26 @@ def cli(site):
 def sites():
     """Sites on this machine: an API URL and a token each.
 
-    Only changes the local configuration; `tokens` manages the tokens on
-    the server."""
+    `tokens` manages your tokens on the server."""
 
 
 @sites.command("add")
 @click.argument("name")
 @click.argument("url")
 @click.option("--token-stdin", is_flag=True, help="Read the token from stdin.")
-def site_add(name, url, token_stdin):
-    """Add a site; asks for the token. URL is where the API is, e.g.
-    https://example.com/api/"""
+@click.option("--no-check", is_flag=True, help="Don't check the token first.")
+def site_add(name, url, token_stdin, no_check):
+    """Add a site; asks for the token, and checks it. URL is where the API
+    is, e.g. https://example.com/api/"""
     token = sys.stdin.readline().strip() if token_stdin else getpass.getpass("Token: ")
+    if not no_check:
+        try:
+            Client(url, token).request("GET", "tokens/")
+        except APIError as exc:
+            data = exc.data if isinstance(exc.data, dict) else {}
+            raise CommandError(
+                f"the token doesn't work ({exc.status} {data.get('detail', '')})."
+            ) from exc
     Sites().add(name, url, token)
 
 
@@ -182,11 +189,8 @@ def site_default(name):
         raise CommandError(f"No site {name!r}.", USAGE) from exc
 
 
-# Tokens #####################################################################
-
-
-def _site_name():
-    site = click.get_current_context().find_root().params.get("site")
+def _site_name(site=None):
+    site = site or click.get_current_context().find_root().params.get("site")
     try:
         return Sites().resolve_name(site)
     except LookupError as exc:
@@ -205,11 +209,17 @@ def _forget(name):
         )
 
 
-@cli.command()
-def logout():
-    """Revoke the token in use and forget the site."""
-    name = _site_name()
-    client, _etags = connect()
+# Tokens #####################################################################
+
+
+@sites.command("logout")
+@click.argument("name", required=False)
+def site_logout(name):
+    """Revoke the token and remove the site.
+
+    Without NAME, the site in use."""
+    name = _site_name(name)
+    client, _etags = connect(name)
     try:
         client.request("DELETE", "tokens/current/")
     except APIError as exc:
@@ -271,7 +281,7 @@ def tokens_list(as_json):
 def tokens_delete(ids, as_json):
     """Revoke tokens by ID (see `tokens list`), e.g. leaked ones.
 
-    Revoking the token in use forgets the site, like `logout`. Read-only
+    Revoking the token in use forgets the site, like `sites logout`. Read-only
     tokens may only revoke themselves."""
     name = _site_name()
     client, _etags = connect()
@@ -651,10 +661,6 @@ def batch(file, apply):
 
 
 cli.add_command(skills)
-# `site`, the name before 0.5, still works
-site_alias = copy.copy(sites)
-site_alias.hidden = True
-cli.add_command(site_alias, "site")
 
 
 def main_exit():

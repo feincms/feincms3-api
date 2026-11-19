@@ -15,15 +15,18 @@ write `uvx feincms3-api-cli` instead.
 
 A site is the API's URL and a token (create one in the admin, or with
 `./manage.py f3api_token`). `f3api sites` keeps them on this machine, in
-`~/.config/f3api/sites.json` (readable by you only), and doesn't talk to
-the server:
+`~/.config/f3api/sites.json` (readable by you only):
 
 ```bash
-f3api sites add example https://example.com/api/   # asks for the token
+f3api sites add example https://example.com/api/   # asks for the token, checks it
 f3api sites list
 f3api sites default example
-f3api --site other list pages.page                      # the first site is the default
+f3api --site other list pages.page                 # the first site is the default
+f3api sites logout example                         # revokes the token, removes the site
 ```
+
+`sites logout` revokes the token on the server too (`sites remove` only
+forgets it); a token which has expired already counts as revoked.
 
 `F3API_URL` and `F3API_TOKEN` replace the default site (not one named with
 `--site`), `F3API_SITE` names the default.
@@ -35,11 +38,10 @@ f3api --site other list pages.page                      # the first site is the 
 ```bash
 f3api tokens                # lists them, * marks the one in use
 f3api tokens delete 12 13   # revokes them, e.g. one which leaked
-f3api logout                # revokes the token in use and removes the site
 ```
 
-Revoking the token in use removes the site (or tells you to unset
-`F3API_TOKEN`); a token which has expired already counts as revoked.
+Revoking the token in use removes the site, like `sites logout` (or tells
+you to unset `F3API_TOKEN`).
 
 ## Reading
 
