@@ -107,7 +107,7 @@ class OpenAPITest(WriteTestCase):
 
         self.assertEqual(
             ops("TestappPage"),
-            ["create", "update", "delete", "replace_content", "update_plugin"],
+            ["create", "update", "delete", "replace_content", "update_plugin", "move"],
         )
         # No plugins: no operations for them
         self.assertEqual(ops("TestappPerson"), ["create", "update", "delete"])

@@ -375,7 +375,7 @@ path which starts with a resource's name answers where the resource is.
 
 | | |
 |---|---|
-| `GET /schema/` | resources (with their `filters`, whether `q` works, `search`, and whether `find/` does, `findable`), their types, regions per template/page type, allowed plugins per region, container plugins |
+| `GET /schema/` | resources (with their `filters`, whether `q` works, `search`, whether `find/` does, `findable`, and where `move/` can put a node, `move_positions`), their types, regions per template/page type, allowed plugins per region, container plugins |
 | `GET /schema/{type}/` | JSON Schema of one type's `fields`, for reading and for writing |
 | `GET /resources/{resource}/` | list: `limit`, `offset`, `q` (the admin's `search_fields`; a `400` if it has none, rather than everything), filters declared on the resource (default: `language_code`, `is_active`, `translation_of`, `site`; pages also `parent`, `page_type`, `path`), `fields=` to thin out, `content=true`, `expand=references` |
 | `POST /resources/{resource}/` | create, with or without `content` |
@@ -384,6 +384,7 @@ path which starts with a resource's name answers where the resource is.
 | `PUT /resources/{resource}/{id}/content/` | replace the content of the regions given |
 | `GET /resources/{resource}/{id}/plugins/{type}/{plugin_id}/` | one plugin |
 | `PATCH /resources/{resource}/{id}/plugins/{type}/{plugin_id}/` | change one plugin's fields |
+| `POST /resources/{resource}/{id}/move/` | move a node in its tree (trees), see below |
 | `DELETE /resources/{resource}/{id}/` | delete |
 | `DELETE /resources/{resource}/{id}/cache/` | delete the cached rendering, see below |
 | `GET /resources/pages.page/find/?path=/de/angebot/` | resolve a path, also with host for multisite |
@@ -496,7 +497,7 @@ ancestors' old content until their own keys are deleted too.
 The endpoints are thin: under them are the operations, methods of
 `ContentAPI` taking a request (the admin's methods need one) and wire data
 (`list()`, `detail()`, `create()`, `update()`, `replace_content()`,
-`update_plugin()`, `delete()`, `clear_cache()`, `batch()`), which do the form handling, permission
+`update_plugin()`, `move()`, `delete()`, `clear_cache()`, `batch()`), which do the form handling, permission
 checks, validation and logging. The ninja endpoints only parse the request,
 call one operation and map its result or errors to a response.
 
@@ -524,6 +525,8 @@ none, and `?dry_run=true` rolls all of them back:
   {"op": "replace_content", "resource": "pages.page", "id": 12, "content": {…}},
   {"op": "update_plugin", "resource": "pages.page", "id": 12,
    "plugin": {"type": "pages.button", "id": 7}, "fields": {…}},
+  {"op": "move", "resource": "pages.page", "id": 12, "position": "before",
+   "relative_to": 14},
   {"op": "delete", "resource": "articles.article", "id": 3, "etag": "…"}
 ]}
 ```
@@ -563,14 +566,24 @@ none, and `?dry_run=true` rolls all of them back:
   slug from the title: a client writing a title can write a slug. `path`
   is computed by `AbstractPage.save()`, never written, except as
   `static_path` with `path` where the admin allows it.
-- **Moving** is a `PATCH` of `parent` and `position` (the position among
-  siblings, as in feincms3), through the admin's form like any change, so
-  feincms3 updates the descendants' paths and refuses a page below itself.
-  No action endpoint of its own.
+- **Moving** is `POST /resources/{resource}/{id}/move/` with `{"position":
+  …, "relative_to": id}`, as the admin's move controls in the changelist
+  do: tree-queries' `MoveNodeForm` with its positions (`before`, `after`,
+  `first-child`, `last-child`, `root`; only `child` and `root` where the
+  admin has no `position_field`, so siblings can't be ordered), the
+  admin's `is_valid_move()` and its renumbering of siblings; the model's
+  `clean()` refuses a page below itself, and feincms3 updates the
+  descendants' paths. `/schema/` lists each tree's `move_positions` (none
+  where the admin isn't a `TreeAdmin`). It's an action endpoint because
+  feincms3's admin forms usually don't have `position`: the changelist
+  moves pages, so a `PATCH` of the fields couldn't order siblings. Where
+  the form has `parent` and `position`, a `PATCH` of them moves too. A
+  move needs the moved node's ETag and changes its siblings' and
+  descendants' ETags; in a batch, those count as written.
 - **Order:** lists of trees are in tree order (siblings in their order,
   children after their parent), whatever the admin's ordering, so
   `?parent=` shows the order of siblings also where the admin's form has
-  no `position` (feincms3's admin moves pages in the changelist instead).
+  no `position`.
 - **Page types** come from `TYPES`; the schema lists each with its regions.
   Application types are created like any page; `PageTypeMixin`'s clean
   refuses a second instance of an app namespace, as in the admin.

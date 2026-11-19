@@ -15,10 +15,16 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db.models import Q, Value
 from django.forms.models import _get_foreign_key
 from django.urls import NoReverseMatch, reverse
+from tree_queries.admin import (
+    MOVE_POSITIONS,
+    MOVE_POSITIONS_PARENT_ONLY,
+    MoveNodeForm,
+    TreeAdmin as BaseTreeAdmin,
+)
 
 from feincms3_api.adapters import Context
 from feincms3_api.codecs import label
-from feincms3_api.errors import APIError, ConflictError
+from feincms3_api.errors import APIError, ConflictError, ValidationFailedError
 
 
 STRUCTURAL_FIELDS = frozenset({"region", "ordering", "depth"})
@@ -550,6 +556,10 @@ class Resource:
     def check_delete(self, request, obj):
         """Raise ``ConflictError`` if ``obj`` mustn't be deleted"""
 
+    def move_positions(self):
+        """Where ``move()`` can put a node; trees only"""
+        return []
+
     def validate_instance(self, obj):
         """
         Errors (``[{"path", "message"}]``) the admin's form doesn't find,
@@ -591,8 +601,9 @@ class TreeResource(Resource):
     """
     A django-tree-queries tree: pages, chapters of a book, categories
 
-    Moved by changing ``parent`` (and ``position``, if the model has one).
-    Deleting a node with children is refused instead of deleting them too.
+    Moved as the admin's move controls do (``move()``), or by changing
+    ``parent`` and ``position`` where the admin's form has them. Deleting a
+    node with children is refused instead of deleting them too.
     Lists are in tree order, siblings in their order, whatever the admin's
     ordering: with ``parent=`` they show the order of the siblings, also
     where the admin's form doesn't have ``position``.
@@ -604,6 +615,96 @@ class TreeResource(Resource):
         return (
             super().get_queryset(request).with_tree_fields().order_by("tree_ordering")
         )
+
+    def move_positions(self):
+        """
+        Where a node can go relative to another, as the admin's move
+        controls offer it; ``[]`` if the admin isn't tree-queries'
+        ``TreeAdmin``. Siblings can only be ordered with a ``position_field``.
+        """
+        model_admin = self.model_admin
+        if not isinstance(model_admin, BaseTreeAdmin):
+            return []
+        if model_admin.position_field:
+            return [*MOVE_POSITIONS, "root"]
+        return [*MOVE_POSITIONS_PARENT_ONLY, "root"]
+
+    def move(self, request, obj, position, relative_to):
+        """
+        Move ``obj`` with tree-queries' ``MoveNodeForm``, which the admin's
+        move controls post to: the same positions, the admin's
+        ``is_valid_move()`` and the same renumbering of siblings
+        """
+        if not (positions := self.move_positions()):
+            raise ConflictError(
+                f"{self.type} can't be moved: its admin isn't a TreeAdmin."
+            )
+        form = MoveNodeForm(
+            {
+                "move": obj.pk,
+                "position": position,
+                "relative_to": "" if relative_to is None else relative_to,
+            },
+            request=request,
+            modeladmin=self.model_admin,
+        )
+        errors = []
+        if position not in positions:
+            errors.append(
+                {"path": "position", "message": f"One of {', '.join(positions)}."}
+            )
+        elif not form.is_valid():
+            errors.extend(
+                {
+                    "path": "" if name in {"__all__", "move"} else name,
+                    "message": str(message),
+                }
+                for name, messages in form.errors.items()
+                for message in messages
+            )
+        if errors:
+            raise ValidationFailedError(errors)
+        self._check_parent(form.cleaned_data)
+        # The form reports through the messages framework; collect them
+        # instead of adding them to the user's next admin page
+        previous = getattr(request, "_messages", None)
+        request._messages = collected = _Messages()
+        try:
+            result = form.process()
+        finally:
+            if previous is None:
+                del request._messages
+            else:
+                request._messages = previous
+        if result != "ok":
+            raise ValidationFailedError(
+                [{"path": "", "message": message} for message in collected]
+                or [{"path": "", "message": "The move failed."}]
+            )
+
+    def _check_parent(self, data):
+        """The model's ``clean()`` with the new parent (not below itself),
+        which ``MoveNodeForm`` only reports as a message"""
+        node, relative_to = data["move"], data["relative_to"]
+        if data["position"] == "root":
+            parent = None
+        elif data["position"] in {"first-child", "last-child", "child"}:
+            parent = relative_to
+        else:
+            parent = relative_to.parent
+        previous = node.parent
+        node.parent = parent
+        try:
+            node.full_clean(exclude=[f.name for f in node._meta.get_fields()])
+        except ValidationError as exc:
+            raise ValidationFailedError(
+                [
+                    {"path": "relative_to", "message": message}
+                    for message in dict.fromkeys(exc.messages)
+                ]
+            ) from exc
+        finally:
+            node.parent = previous
 
     def check_delete(self, request, obj):
         children = self.model._default_manager.filter(parent=obj)
@@ -670,3 +771,10 @@ class PageResource(TreeResource):
 
     def describe(self, request, obj):
         return {"path": obj.path, **super().describe(request, obj)}
+
+
+class _Messages(list):
+    """Stands in for the messages framework's storage"""
+
+    def add(self, level, message, extra_tags=""):
+        self.append(str(message))

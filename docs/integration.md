@@ -79,7 +79,7 @@ model is:
 
 | Model | Resource |
 |---|---|
-| feincms3 pages | `PageResource`: paths, `find/?path=`, moving by `parent` and `position` (where the admin's form has it), lists in tree order, feincms3-sites and feincms3-language-sites |
+| feincms3 pages | `PageResource`: paths, `find/?path=`, moving as the admin's move controls do (`move/`, with tree-queries' `TreeAdmin`), lists in tree order, feincms3-sites and feincms3-language-sites |
 | other django-tree-queries trees (chapters, categories) | `TreeResource`: a `parent` filter, deleting nodes with children is refused |
 | anything else, with or without plugins | `ObjectResource` |
 | django-cabinet | `FileResource()`, `FolderResource()` from `feincms3_api.cabinet` |

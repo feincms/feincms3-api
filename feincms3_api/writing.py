@@ -11,6 +11,7 @@ import os
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
+from django.utils.translation import gettext as _
 
 from feincms3_api import stored
 from feincms3_api.adapters import form_errors
@@ -260,6 +261,56 @@ class WritingMixin:
             plugin=(inline, plugin),
             read=read,
         )
+
+    def move(
+        self, request, name, pk, payload, *, if_match, dry_run=False, changed=None
+    ):
+        """
+        Move an object in its tree as the admin's move controls do:
+        ``payload`` is ``{"position": …, "relative_to": id}``, the position
+        one of the resource's ``move_positions()`` (``relative_to`` isn't
+        needed for ``root``). ``changed``, a set, collects ``(name, id)`` of
+        the objects whose ETag may have changed: the moved subtree and its
+        new siblings.
+        """
+        resource, obj = self._get(request, name, pk)
+        if not resource.move_positions():
+            raise ConflictError(f"{resource.type} can't be moved.")
+        self._check_change(request, resource, obj)
+        errors = []
+        if not isinstance(payload, dict):
+            errors.append({"path": "", "message": "Expected an object."})
+        else:
+            errors.extend(
+                {"path": key, "message": "Unknown key."}
+                for key in sorted(set(payload) - {"position", "relative_to"})
+            )
+            if not isinstance(payload.get("position"), str):
+                errors.append({"path": "position", "message": "Missing."})
+        if errors:
+            raise ValidationFailedError(errors)
+        self._check_etag(request, resource, obj, if_match)
+        position, relative_to = payload["position"], payload.get("relative_to")
+        with transaction.atomic():
+            resource.move(request, obj, position, relative_to)
+            _resource, obj = self._get(request, name, pk)
+            where = position if relative_to is None else f"{position} {relative_to}"
+            resource.model_admin.log_change(
+                request, obj, f"Moved ({where}). {_('(Through the API.)')}"
+            )
+            if changed is not None:
+                manager = resource.model._default_manager
+                changed.update(
+                    (name, str(node))
+                    for node in [
+                        *manager.filter(parent=obj.parent).values_list("pk", flat=True),
+                        *obj.descendants().values_list("pk", flat=True),
+                    ]
+                )
+            result = resource.read(request, obj, self)
+            if dry_run:
+                transaction.set_rollback(True)
+        return result
 
     def delete(self, request, name, pk, *, if_match, dry_run=False):
         resource, obj = self._get(request, name, pk)

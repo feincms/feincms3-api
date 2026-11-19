@@ -20,6 +20,7 @@ OPERATIONS = {
     "update": ({"resource", "id"}, {"etag", "fields", "content", "inlines"}),
     "replace_content": ({"resource", "id", "content"}, {"etag"}),
     "update_plugin": ({"resource", "id", "plugin", "fields"}, {"etag"}),
+    "move": ({"resource", "id", "position"}, {"etag", "relative_to"}),
     "delete": ({"resource", "id"}, {"etag"}),
 }
 
@@ -116,6 +117,19 @@ class BatchMixin:
                 operation["plugin"]["id"],
                 {"fields": operation["fields"]},
                 if_match=if_match,
+            )
+        if op == "move":
+            return self.move(
+                request,
+                name,
+                pk,
+                {
+                    key: operation[key]
+                    for key in ("position", "relative_to")
+                    if key in operation
+                },
+                if_match=if_match,
+                changed=written,
             )
         self.delete(request, name, pk, if_match=if_match)
         return None

@@ -373,6 +373,8 @@ class Components:
                 }
             return properties
 
+        positions = resource.move_positions()
+
         def batch_operation(ref):
             target = {
                 "resource": {"const": resource.name},
@@ -428,9 +430,43 @@ class Components:
                         ["id", "plugin", "fields"],
                     ),
                 ]
+            if positions:
+                operations.append(
+                    operation(
+                        "move",
+                        target
+                        | move_properties()
+                        | {
+                            "relative_to": {
+                                "oneOf": [pk_schema(resource.model), ref("Ref")]
+                            }
+                        },
+                        ["id", "position"],
+                    )
+                )
             return {"oneOf": operations}
 
+        def move_properties():
+            return {
+                "position": {
+                    "enum": positions,
+                    "description": "Where the node goes, relative to"
+                    " relative_to (not needed for root)",
+                },
+                "relative_to": {
+                    **pk_schema(resource.model),
+                    "description": "The node the position is relative to",
+                },
+            }
+
         builders[f"{name}BatchOperation"] = batch_operation
+        if positions:
+            builders[f"{name}Move"] = lambda ref: {
+                "type": "object",
+                "properties": move_properties(),
+                "required": ["position"],
+                "additionalProperties": False,
+            }
         builders[name] = lambda ref: {
             "type": "object",
             "title": str(resource.model._meta.verbose_name),

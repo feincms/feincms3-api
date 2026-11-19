@@ -305,6 +305,31 @@ def _add_routes(api, router, resource, components):
         )
         return HttpResponse(status=204)
 
+    if resource.move_positions():
+
+        @router.post(
+            f"{prefix}/{{pk}}/move/",
+            operation_id=f"{operation}_move",
+            response=responses({200: read_type}, *writes),
+        )
+        @_errors
+        def move(
+            request,
+            pk: str,
+            payload: Body[components.annotation(f"{component}Move")],
+            dry_run: bool = False,
+        ):
+            """Move a node as the admin's move controls do"""
+            wire = api.move(
+                request,
+                name,
+                pk,
+                payload,
+                if_match=request.headers.get("If-Match"),
+                dry_run=dry_run,
+            )
+            return _json(wire)
+
     @router.delete(
         f"{prefix}/{{pk}}/cache/",
         operation_id=f"{operation}_cache_clear",

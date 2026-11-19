@@ -34,6 +34,7 @@ class SchemaMixin:
                     "filters": resource.filters(),
                     "search": resource.searchable(request),
                     "findable": resource.findable,
+                    "move_positions": resource.move_positions(),
                     "region_sets": region_sets,
                     "inlines": [
                         label(inline.model)

@@ -20,7 +20,7 @@ errors, ETags, dry runs, tokens and uploads.
 ```
 HTTP ──▶ http.py ──▶ ContentAPI (api.py)
           ninja       ├─ reading.py   list, detail, find, plugin
-          routes      ├─ writing.py   create, update, update_plugin, delete, clear_cache, upload
+          routes      ├─ writing.py   create, update, update_plugin, move, delete, clear_cache, upload
                       ├─ batch.py     several writes in one transaction
                       ├─ schema.py    /schema/, /schema/{type}/
                       └─ openapi.py   typed OpenAPI components

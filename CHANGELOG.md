@@ -13,6 +13,11 @@
 - Lists of trees (`TreeResource`, `PageResource`) are in tree order,
   whatever the admin's ordering: `?parent=` shows the order of siblings,
   also where the admin's form has no `position`.
+- Moving nodes of trees as the admin's move controls do:
+  `POST /resources/{name}/{id}/move/` with `position` (`before`, `after`,
+  `first-child`, `last-child`, `root`) and `relative_to`, also as the
+  batch operation `move`. It orders siblings also where the admin's form
+  has no `position`. `/schema/` lists each resource's `move_positions`.
 - `/schema/` says which resources can find objects by path (`findable`).
 - The CLI's change log has a title of its own in the docs' navigation.
 
