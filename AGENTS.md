@@ -60,9 +60,8 @@
 - No AI attribution lines. Commits which move or rework code from
   feincms3-autotranslate credit its author with
   `Co-authored-by: Moritz Wettstein <mw@feinheit.ch>`.
-- Push in batches: commit locally as you go, push to `origin`
-  (github.com/feincms/feincms3-api) after a batch of related commits, not
-  after every commit, and always with the tests passing.
+- Push right away: push to `origin` (github.com/feincms/feincms3-api)
+  after committing, always with the tests passing, without asking.
 - Keep commit messages short and don't repeat what the diff or changelog
   already says; a concise subject line is usually enough.
 
