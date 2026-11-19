@@ -143,6 +143,7 @@ class Person(models.Model):
     portrait = CabinetForeignKey(
         on_delete=models.PROTECT, blank=True, null=True, related_name="+"
     )
+    links = models.JSONField(blank=True, default=dict)
 
     def __str__(self):
         return self.name

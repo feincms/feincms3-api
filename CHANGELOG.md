@@ -2,6 +2,11 @@
 
 ## Next version
 
+- Fixed writing `JSONField`s: `{}` and `[]` ended up as `null` (the form
+  field takes them for empty), so saving failed for fields with
+  `default=dict`, also when the field wasn't part of the change. JSON is
+  given to the form serialized, as the admin's textarea sends it.
+
 ## 0.5 (2026-11-19)
 
 - **Backwards incompatible:** the resources are below `resources/`

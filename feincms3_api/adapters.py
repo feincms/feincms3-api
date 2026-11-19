@@ -214,6 +214,12 @@ class FormAdapter:
                 except WireError as exc:
                     errors.append({"path": field_path, "message": str(exc)})
 
+        # JSON as the admin's textarea sends it: the form fields take {}
+        # and [] for empty (None) and parse strings as JSON
+        for name, form_field in unbound.fields.items():
+            if isinstance(form_field, forms.JSONField) and name in data:
+                data[name] = form_field.prepare_value(data[name])
+
         data.update(extra or {})
         return data, errors
 

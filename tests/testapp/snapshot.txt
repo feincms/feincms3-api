@@ -95,6 +95,7 @@ testapp.person (resource)
   role_fr: text
   role_it: text
   portrait: ref cabinet.file
+  links: json
 testapp.rating (plugin of testapp.form)
   name: machine
   label: text

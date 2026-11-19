@@ -442,3 +442,24 @@ class CacheTest(WriteTestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertEqual(cache.get(key), "rendered")
+
+
+class JSONFieldTest(WriteTestCase):
+    def test_empty_values(self):
+        """{} and [] are values, not empty; the form field turns them into None"""
+        person = Person.objects.create(name="Anna")
+        path = f"resources/testapp.person/{person.pk}/"
+        for value in [{}, [], {"web": "https://example.com"}, ["a"], 0, "text"]:
+            with self.subTest(value=value):
+                response = self.send(
+                    "patch", path, {"fields": {"links": value}}, etag=self.etag(path)
+                )
+                self.assertEqual(response.status_code, 200, response.content)
+                person.refresh_from_db()
+                self.assertEqual(person.links, value)
+
+        # Writing other fields keeps the JSON as it is
+        response = self.send(
+            "patch", path, {"fields": {"name": "Anna B."}}, etag=self.etag(path)
+        )
+        self.assertEqual(response.status_code, 200, response.content)
