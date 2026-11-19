@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.5.1 (2026-11-19)
+
 - The translate skill spells out that a translated page needs a parent in
   the target language: when the source's parent has no counterpart there,
   it asks, offering to translate the missing ancestors too, instead of
