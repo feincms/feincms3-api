@@ -2,6 +2,8 @@
 
 ## Next version
 
+## 0.5 (2026-11-19)
+
 - **Backwards incompatible:** the resources are below `resources/`
   (`/api/resources/pages/17/`), so that a resource can take any name,
   also `schema`, `uploads`, `batch` or `tokens` (#22). A path starting with
