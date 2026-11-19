@@ -120,6 +120,35 @@ class CLITest(LiveServerTestCase):
         self.assertEqual(code, 0)
         self.assertIn("Exit codes", out)
 
+    def test_move(self):
+        a, b = (
+            Page.objects.create(
+                title=slug,
+                slug=slug,
+                parent=self.home,
+                language_code="de",
+                page_type="standard",
+            )
+            for slug in ("a", "b")
+        )
+        self.run_cli("get", "testapp.page", b.pk)
+        code, data, err = self.run_cli("move", "testapp.page", b.pk, "before", a.pk)
+        self.assertEqual(code, 0, err)
+        self.assertIn("dry run", err)
+        code, data, err = self.run_cli(
+            "move", "testapp.page", b.pk, "before", a.pk, "--apply"
+        )
+        self.assertEqual(code, 0, err)
+        self.assertEqual(
+            list(self.home.children.values_list("slug", flat=True)), ["b", "a"]
+        )
+        # The ETag of the moved page is kept
+        code, data, err = self.run_cli(
+            "move", "testapp.page", b.pk, "last-child", a.pk, "--apply"
+        )
+        self.assertEqual(code, 0, err)
+        self.assertEqual(data["meta"]["path"], "/de/a/b/")
+
     def test_update_with_etags(self):
         page = f"{self.home.pk}"
         body = '{"fields": {"title": "Neu"}}'

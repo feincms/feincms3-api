@@ -581,6 +581,38 @@ def update_plugin(resource, id, type, plugin_id, file, apply, etag, force):
 @cli.command()
 @click.argument("resource")
 @click.argument("id")
+@click.argument(
+    "position",
+    type=click.Choice(
+        ["before", "after", "first-child", "last-child", "child", "root"]
+    ),
+)
+@click.argument("relative_to", required=False)
+@writing()
+def move(resource, id, position, relative_to, apply, etag, force):
+    """Move a node in its tree, as the admin's move controls do.
+
+    POSITION is relative to the node RELATIVE_TO (not needed for root);
+    `schema` lists the positions a resource has (move_positions)."""
+    client, etags = connect()
+    body = {"position": position}
+    if relative_to is not None:
+        body["relative_to"] = relative_to
+    _status, data = client.request(
+        "POST",
+        f"resources/{resource}/{id}/move/",
+        params=_params(apply),
+        body=body,
+        headers={"If-Match": _if_match(etags, resource, id, etag=etag, force=force)},
+    )
+    if apply:
+        etags.update({(resource, id): _etag(data)})
+    _written(apply, data)
+
+
+@cli.command()
+@click.argument("resource")
+@click.argument("id")
 @writing()
 def delete(resource, id, apply, etag, force):
     """Delete an object."""

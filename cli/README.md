@@ -80,6 +80,7 @@ f3api update-plugin pages.page 17 pages.button 103 --apply <<'EOF'
 {"button_label": "Kontakt"}
 EOF
 f3api create pages.page new-page.json --apply
+f3api move pages.page 17 before 12 --apply                # also after, first-child, last-child, root
 f3api delete articles.article 3 --apply
 f3api cache-clear pages.page 17
 f3api upload team.jpg              # prints {"upload": "…"} to use in fields
