@@ -2,6 +2,8 @@
 
 ## Next version
 
+- The CLI's change log has a title of its own in the docs' navigation.
+
 ## 0.4 (2026-11-19)
 
 - **Backwards incompatible:** the token admin needs the model permissions

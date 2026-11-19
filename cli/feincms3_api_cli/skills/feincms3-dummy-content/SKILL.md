@@ -23,7 +23,7 @@ unless `--apply` is given.
 
 Ask, unless the user said so already:
 
-- **The site**: `f3api site list`; dummy content belongs on a development
+- **The site**: `f3api sites list`; dummy content belongs on a development
   or staging site. On a production site, only if the user insists.
 - **Language** (`language_code`) and **where**: below which page the dummy
   root goes (`f3api find /de/`), or as a root of its own.

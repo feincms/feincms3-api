@@ -88,7 +88,7 @@ class Sites:
         name = name or os.environ.get("F3API_SITE") or self.data.get("default")
         if not name or name not in self.data["sites"]:
             raise LookupError(
-                f"No site: add one with `{prog()} site add NAME URL`, or set"
+                f"No site: add one with `{prog()} sites add NAME URL`, or set"
                 " F3API_URL and F3API_TOKEN."
             )
         return name

@@ -21,7 +21,7 @@ for a fix afterwards, and then each fix is a dry run first.
 
 Ask, unless the user said so already:
 
-- **The site**: `f3api site list`.
+- **The site**: `f3api sites list`.
 - **What**: the whole site, one language, a subtree (`f3api find /de/angebot/`),
   or other resources (articles, …).
 - **Which checks** (step 4): all of them (default), or e.g. only

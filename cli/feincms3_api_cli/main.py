@@ -1,7 +1,7 @@
 """
 The feincms3 content API from the command line (``f3api``)
 
-Reads print JSON; ``site list``, ``resources``, ``list`` and ``tokens`` print tables
+Reads print JSON; ``sites list``, ``resources``, ``list`` and ``tokens`` print tables
 in a terminal (JSON with ``--json``, or when the output isn't a terminal).
 Writes are dry runs unless ``--apply`` is given, and send the ETag of the
 object as it was last read with this tool (``get``, ``list``, ``find``), so
@@ -9,6 +9,7 @@ they fail instead of overwriting someone else's change. Errors are printed
 with their paths.
 """
 
+import copy
 import getpass
 import json
 import os
@@ -116,7 +117,7 @@ def _etag(wire):
     epilog="Exit codes: 0 done, 1 failed, 2 usage, 3 invalid data (with"
     " paths), 4 conflict (ETag, references), 5 not found, 6 not allowed.",
 )
-@click.option("--site", help="A site added with `site add`.")
+@click.option("--site", help="A site added with `sites add`.")
 def cli(site):
     """The feincms3 content API from the command line."""
 
@@ -125,11 +126,14 @@ def cli(site):
 
 
 @cli.group()
-def site():
-    """The sites and their tokens."""
+def sites():
+    """Sites on this machine: an API URL and a token each.
+
+    Only changes the local configuration; `tokens` manages the tokens on
+    the server."""
 
 
-@site.command("add")
+@sites.command("add")
 @click.argument("name")
 @click.argument("url")
 @click.option("--token-stdin", is_flag=True, help="Read the token from stdin.")
@@ -140,7 +144,7 @@ def site_add(name, url, token_stdin):
     Sites().add(name, url, token)
 
 
-@site.command("list")
+@sites.command("list")
 @json_option
 def site_list(as_json):
     """The sites."""
@@ -158,7 +162,7 @@ def site_list(as_json):
     console.print(rows)
 
 
-@site.command("remove")
+@sites.command("remove")
 @click.argument("name")
 def site_remove(name):
     """Remove a site."""
@@ -168,7 +172,7 @@ def site_remove(name):
         raise CommandError(f"No site {name!r}.", USAGE) from exc
 
 
-@site.command("default")
+@sites.command("default")
 @click.argument("name")
 def site_default(name):
     """Use a site by default."""
@@ -197,7 +201,7 @@ def _forget(name):
         Sites().remove(name)
         message(
             f"removed the site {name!r}; add it again with a new token"
-            f" ({prog()} site add)."
+            f" ({prog()} sites add)."
         )
 
 
@@ -228,7 +232,8 @@ def logout():
 @cli.group(invoke_without_command=True)
 @click.pass_context
 def tokens(ctx):
-    """Your tokens; without a command, lists them."""
+    """Your tokens on the server of the site in use; without a command,
+    lists them."""
     if ctx.invoked_subcommand is None:
         ctx.invoke(tokens_list)
 
@@ -630,6 +635,10 @@ def batch(file, apply):
 
 
 cli.add_command(skills)
+# `site`, the name before 0.5, still works
+site_alias = copy.copy(sites)
+site_alias.hidden = True
+cli.add_command(site_alias, "site")
 
 
 def main_exit():

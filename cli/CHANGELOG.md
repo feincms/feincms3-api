@@ -2,6 +2,10 @@
 
 ## Next version
 
+- `f3api site` is now `f3api sites`, like `tokens` (`site` still works).
+  The help and the README say which manages the sites on this machine and
+  which the tokens on the server.
+
 ## 0.4 (2026-11-19)
 
 - `f3api tokens` (or `tokens list`) lists your tokens, `f3api tokens

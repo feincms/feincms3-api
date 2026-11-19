@@ -212,7 +212,7 @@ class CLITest(LiveServerTestCase):
     def test_sites(self):
         with mock.patch.dict(os.environ, {"F3API_URL": ""}):
             code, _data, _err = self.run_cli(
-                "site",
+                "sites",
                 "add",
                 "here",
                 f"{self.live_server_url}/api/",
@@ -220,8 +220,12 @@ class CLITest(LiveServerTestCase):
                 stdin=self.secret,
             )
             self.assertEqual(code, 0)
-            code, data, _err = self.run_cli("site", "list")
+            code, data, _err = self.run_cli("sites", "list")
             self.assertEqual(data["here"]["default"], True)
+            # The old name still works, but isn't listed
+            self.assertEqual(self.run_cli("site", "list")[1], data)
+            code, help, _err = self.run_cli("--help", tty=True)
+            self.assertNotIn(" site ", help)
             config = Path(self.dirs.name) / "config" / "sites.json"
             self.assertEqual(config.stat().st_mode & 0o777, 0o600)
             with mock.patch.dict(os.environ, {"F3API_TOKEN": ""}):
@@ -259,7 +263,7 @@ class CLITest(LiveServerTestCase):
         _token, secret = APIToken.objects.create_token(user=user, name="read")
 
         def add_site(url, secret):
-            self.run_cli("site", "add", "here", url, "--token-stdin", stdin=secret)
+            self.run_cli("sites", "add", "here", url, "--token-stdin", stdin=secret)
 
         with mock.patch.dict(os.environ, {"F3API_URL": ""}):
             add_site(f"{self.live_server_url}/api/", secret)
@@ -268,7 +272,7 @@ class CLITest(LiveServerTestCase):
             self.assertEqual(code, 0, err)
             self.assertIn("removed the site 'here'", err)
             self.assertFalse(APIToken.objects.exists())
-            self.assertEqual(self.run_cli("site", "list")[1], {})
+            self.assertEqual(self.run_cli("sites", "list")[1], {})
 
             # A token which doesn't work anymore is gone already
             add_site(f"{self.live_server_url}/api/", secret)
@@ -280,7 +284,7 @@ class CLITest(LiveServerTestCase):
             code, _data, err = self.run_cli("logout")
             self.assertEqual(code, 1)
             self.assertIn("couldn't revoke the token", err)
-            self.assertEqual(self.run_cli("site", "list")[1], {})
+            self.assertEqual(self.run_cli("sites", "list")[1], {})
 
     def test_transport_errors(self):
         with mock.patch.dict(os.environ, {"F3API_URL": "http://127.0.0.1:1/"}):

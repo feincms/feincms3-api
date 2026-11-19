@@ -24,7 +24,7 @@ unless `--apply` is given.
 
 Ask, unless the user said so already:
 
-- **The site**: `f3api site list` (`--site NAME` for another than the
+- **The site**: `f3api sites list` (`--site NAME` for another than the
   default), and `f3api resources` for what it exposes.
 - **The source**: a page (`f3api find /de/angebot/`), a subtree (the page
   and everything below it), or other objects (articles, …).

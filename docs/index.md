@@ -9,6 +9,6 @@ architecture
 translating
 spec
 cli
-changelog
-cli-changelog
+Change log <changelog>
+CLI change log <cli-changelog>
 ```
