@@ -10,6 +10,9 @@
   `app_label.model_name` (`pages.page` instead of `pages`): unique, and no
   English pluralizing. cabinet's resources are `cabinet.file` and
   `cabinet.folder`. Names are checked to be URL segments.
+- Lists of trees (`TreeResource`, `PageResource`) are in tree order,
+  whatever the admin's ordering: `?parent=` shows the order of siblings,
+  also where the admin's form has no `position`.
 - `/schema/` says which resources can find objects by path (`findable`).
 - The CLI's change log has a title of its own in the docs' navigation.
 

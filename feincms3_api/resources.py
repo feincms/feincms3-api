@@ -593,9 +593,17 @@ class TreeResource(Resource):
 
     Moved by changing ``parent`` (and ``position``, if the model has one).
     Deleting a node with children is refused instead of deleting them too.
+    Lists are in tree order, siblings in their order, whatever the admin's
+    ordering: with ``parent=`` they show the order of the siblings, also
+    where the admin's form doesn't have ``position``.
     """
 
     filter_fields = (*Resource.filter_fields, "parent")
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request).with_tree_fields().order_by("tree_ordering")
+        )
 
     def check_delete(self, request, obj):
         children = self.model._default_manager.filter(parent=obj)

@@ -64,7 +64,9 @@ For a subtree, walk it, parents before children:
 f3api list pages.page -f parent=17 --fields title,path --limit 200
 ```
 
-Repeat for each child. Other resources with `language_code` and
+Lists of trees are in tree order, so `-f parent=` lists the children in
+their order, also where pages have no `position` field. Repeat for each
+child. Other resources with `language_code` and
 `translation_of` filters (see `f3api schema` and the resource's list) work
 the same way, without the tree.
 
@@ -122,7 +124,11 @@ f3api find /de/kontakt/            # an internal link's page, then as above
 
 ## 6. One batch, dry run first
 
-Put all operations into one file, parents before children:
+Put all operations into one file, parents before children, and siblings
+in their source order: a new page goes last among its siblings unless the
+schema has `position` and it's set. To compare the order with an existing
+translation, list both parents' children (`f3api list pages.page -f
+parent=… --fields title,translation_of`).
 
 ```json
 {"operations": [

@@ -1,5 +1,8 @@
 """Content models other than pages: feincms3-forms, a tree without paths"""
 
+from unittest import mock
+
+from testapp.admin import ChapterAdmin
 from testapp.models import (
     Chapter,
     ChapterText,
@@ -176,6 +179,27 @@ class ChaptersTest(WriteTestCase):
         self.levers = Chapter.objects.create(
             textbook=self.book, title="Hebel", parent=self.mechanics
         )
+
+    def test_tree_order(self):
+        # Siblings in their order, children after their parent, whatever the
+        # admin's ordering
+        later = Chapter.objects.create(textbook=self.book, title="A", position=20)
+        self.mechanics.position = 10
+        self.mechanics.save()
+        with mock.patch.object(
+            ChapterAdmin,
+            "get_queryset",
+            lambda self, request: Chapter.objects.order_by("title"),
+        ):
+            data = self.get("resources/testapp.chapter/").json()
+            self.assertEqual(
+                [item["id"] for item in data["items"]],
+                [self.mechanics.pk, self.levers.pk, later.pk],
+            )
+            data = self.get("resources/testapp.chapter/", parent="null").json()
+            self.assertEqual(
+                [item["id"] for item in data["items"]], [self.mechanics.pk, later.pk]
+            )
 
     def test_create_and_move(self):
         response = self.send(

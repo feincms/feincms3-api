@@ -567,6 +567,10 @@ none, and `?dry_run=true` rolls all of them back:
   siblings, as in feincms3), through the admin's form like any change, so
   feincms3 updates the descendants' paths and refuses a page below itself.
   No action endpoint of its own.
+- **Order:** lists of trees are in tree order (siblings in their order,
+  children after their parent), whatever the admin's ordering, so
+  `?parent=` shows the order of siblings also where the admin's form has
+  no `position` (feincms3's admin moves pages in the changelist instead).
 - **Page types** come from `TYPES`; the schema lists each with its regions.
   Application types are created like any page; `PageTypeMixin`'s clean
   refuses a second instance of an app namespace, as in the admin.
