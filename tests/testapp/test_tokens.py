@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
-from django.test import RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
 from ninja.errors import HttpError
 
@@ -50,6 +50,12 @@ class TokenTest(TestCase):
         token.expires_at = timezone.now() - timedelta(seconds=1)
         token.save()
         self.assertEqual(self.get("pages/", secret).status_code, 401)
+
+        # Not a CSRF failure of the session auth tried next
+        response = Client(enforce_csrf_checks=True).delete(
+            f"/api/pages/{self.page.pk}/", headers={"authorization": f"Bearer {secret}"}
+        )
+        self.assertEqual(response.status_code, 401)
 
         token.expires_at = timezone.now() + timedelta(days=1)
         token.save()

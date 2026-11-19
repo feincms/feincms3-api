@@ -24,6 +24,20 @@ class TokenAuth(HttpBearer):
         return api_token.user
 
 
+class StaffSessionAuth(SessionAuthIsStaff):
+    """
+    The session of a staff user, but not for requests with a bearer token
+
+    An invalid token (expired, revoked) is a ``401`` then, not the CSRF
+    failure of the session auth's check, which comes first.
+    """
+
+    def __call__(self, request):
+        if request.headers.get("Authorization", "").lower().startswith("bearer "):
+            return None
+        return super().__call__(request)
+
+
 def default_auth():
     """Tokens first: session auth fails without a CSRF token"""
-    return [TokenAuth(), SessionAuthIsStaff()]
+    return [TokenAuth(), StaffSessionAuth()]

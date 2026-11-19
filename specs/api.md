@@ -651,7 +651,9 @@ are [#5](https://github.com/feincms/feincms3-api/issues/5).
 - `ContentAPI(auth=…)` takes django-ninja auth classes. The default is
   bearer tokens, then ninja's `SessionAuthIsStaff` (for the docs page and
   calls from the admin, with Django's CSRF protection); tokens first, since
-  session auth fails without a CSRF token.
+  session auth fails without a CSRF token. Requests with a bearer token
+  don't fall back to the session: an invalid token is a `401`, not the
+  session auth's CSRF failure.
 - **Bearer tokens** for scripts and agents, from a token model in the
   package (`APIToken`), since the API is tiresome to use without them.
 - **Creating tokens:** in the admin, where every active staff user manages

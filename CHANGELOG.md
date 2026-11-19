@@ -3,6 +3,9 @@
 ## Next version
 
 - Tests run with the oldest and the newest Python per Django version.
+- Fixed: writes with an invalid token (expired, revoked) were a `403`
+  "CSRF check Failed" of the session auth tried next instead of a `401`.
+  Requests with a bearer token don't fall back to the session anymore.
 
 ## 0.3 (2026-11-17)
 
